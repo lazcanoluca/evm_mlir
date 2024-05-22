@@ -1,0 +1,10 @@
+[package]
+name = "evm_mlir"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/lambdaclass/evm_mlir/"
+readme = "README.md"
+license = "LICENSE"
+keywords = ["ethereum", "evm"]
+
+[dependencies]
