@@ -1,4 +1,9 @@
-use evm_mlir::codegen::context::{self, compile_to_object};
+use std::{fs::read_to_string, path::PathBuf};
+
+use evm_mlir::codegen::{
+    context::{self, compile_to_object},
+    module::MLIRModule,
+};
 
 use crate::opcodes::Opcode;
 
@@ -36,25 +41,18 @@ fn main() {
     println!("Stack:");
     println!("{:?}", stack);
 
-
     let context = context::Context::new();
 
-    dbg!("context created");    
+    dbg!("context created");
 
-    let result = context.compile(Vec::new());
+    let result = context.compile(Vec::new()).unwrap();
 
     dbg!("compiled");
 
-    dbg!(result);
-    // ---> opcodes --> Context
+    let source_code = read_to_string(PathBuf::from("generated.mlir.bak")).unwrap();
 
-    // let context = Context::new()
+    // let mlir_module =
+    //     MLIRModule::parse(&context.melior_context, &source_code).unwrap();
 
-    // let module = context.compile(opcodes);
-
-    // compile_to_object(module);
-    // "exe"
-
-    // ./exe
-
+    compile_to_object(&result).unwrap();
 }

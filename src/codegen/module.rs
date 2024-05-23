@@ -1,4 +1,4 @@
-use melior::ir::Module as MeliorModule;
+use melior::{ir::Module as MeliorModule, Context};
 use std::fmt::Debug;
 
 pub struct MLIRModule<'m> {
@@ -14,6 +14,10 @@ impl<'m> MLIRModule<'m> {
 
     pub fn module(&self) -> &MeliorModule {
         &self.melior_module
+    }
+
+    pub fn parse(context: &Context, source: &str) -> Option<Self> {
+        MeliorModule::parse(context, source).map(Self::new)
     }
 }
 

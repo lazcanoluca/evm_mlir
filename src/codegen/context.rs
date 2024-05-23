@@ -4,11 +4,16 @@ use std::{
     mem::MaybeUninit,
     path::PathBuf,
     ptr::{addr_of_mut, null_mut},
+    sync::OnceLock,
 };
 
 use llvm_sys::{
     core::{LLVMContextCreate, LLVMContextDispose, LLVMDisposeMessage, LLVMDisposeModule},
     error::LLVMGetErrorMessage,
+    target::{
+        LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs,
+        LLVM_InitializeAllTargets,
+    },
     target_machine::{
         LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
         LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures,
@@ -22,7 +27,7 @@ use llvm_sys::{
 use melior::{
     dialect::{arith, llvm, DialectRegistry},
     ir::{
-        attribute::{IntegerAttribute, StringAttribute},
+        attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
         operation::OperationBuilder,
         r#type::IntegerType,
         Block, Identifier, Location, Module as MeliorModule, Region,
@@ -41,7 +46,7 @@ use super::module::MLIRModule;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Context {
-    melior_context: MeliorContext,
+    pub melior_context: MeliorContext,
 }
 
 unsafe impl Send for Context {}
@@ -60,16 +65,24 @@ impl Context {
     }
 
     pub fn compile(&self, _program: Vec<Operation>) -> Result<MLIRModule, String> {
+        static INITIALIZED: OnceLock<()> = OnceLock::new();
+        INITIALIZED.get_or_init(|| unsafe {
+            LLVM_InitializeAllTargets();
+            LLVM_InitializeAllTargetInfos();
+            LLVM_InitializeAllTargetMCs();
+            LLVM_InitializeAllAsmPrinters();
+        });
+
         let target_triple = get_target_triple();
         dbg!(target_triple.clone());
         // let module_region = Region::new();
         // module_region.append_block(Block::new(&[]));
 
-
         let location = Location::unknown(&self.melior_context);
 
         let module_region = Region::new();
         let block = Block::new(&[]);
+        // build a single push1 op
 
         let constant_1024 = block
             .append_operation(arith::constant(
@@ -83,7 +96,6 @@ impl Context {
             .into();
 
         let result_layout = Layout::from_size_align(64, 8).unwrap();
-        // build a single push1 op
         let _op = block
             .append_operation(
                 OperationBuilder::new("llvm.alloca", location)
@@ -98,11 +110,8 @@ impl Context {
                         ),
                         (
                             Identifier::new(&self.melior_context, "elem_type"),
-                            IntegerAttribute::new(
-                                IntegerType::new(&self.melior_context, 256).into(),
-                                result_layout.align().try_into().unwrap(),
-                            )
-                            .into(),
+                            TypeAttribute::new(IntegerType::new(&self.melior_context, 256).into())
+                                .into(),
                         ),
                     ])
                     .add_operands(&[constant_1024])
@@ -112,9 +121,7 @@ impl Context {
             )
             .result(0)
             .unwrap();
-        // .into();
         module_region.append_block(block);
-
 
         let data_layout_ret = &get_data_layout_rep()?;
 
@@ -148,9 +155,7 @@ impl Context {
 
         // super::codegen::compile_program(codegen_ctx)?;
 
-
         assert!(melior_module.as_operation().verify());
-
 
         dbg!(melior_module.as_operation().to_string());
         std::fs::write(
@@ -192,7 +197,7 @@ pub fn initialize_mlir() -> MeliorContext {
         registry
     });
     context.load_all_available_dialects();
-    register_all_passes();
+    // register_all_passes();
     register_all_llvm_translations(&context);
     context
 }
@@ -218,7 +223,6 @@ pub fn get_data_layout_rep() -> Result<String, String> {
                 CStr::from_ptr(value).to_string_lossy().into_owned()
             };
             dbg!(target_triple.clone());
-            
         }
         let target_cpu = LLVMGetHostCPUName();
         dbg!(target_cpu.clone());
@@ -277,7 +281,7 @@ pub fn compile_to_object(
     module: &MLIRModule<'_>,
 ) -> Result<PathBuf, String> {
     // TODO: put a proper target_file here
-    let target_file = PathBuf::from("output.o");
+    let target_file = PathBuf::from("output.s");
     // let target_file = session.output_file.with_extension("o");
 
     // TODO: Rework so you can specify target and host features, etc.
@@ -393,33 +397,30 @@ pub fn compile_to_object(
             LLVMDisposeMessage(*error_buffer);
         }
 
-        // if session.output_asm {
-        //     let filename = CString::new(
-        //         target_file
-        //             .with_extension("asm")
-        //             .as_os_str()
-        //             .to_string_lossy()
-        //             .as_bytes(),
-        //     )
-        //     .unwrap();
-        //     let ok = LLVMTargetMachineEmitToFile(
-        //         machine,
-        //         llvm_module,
-        //         filename.as_ptr().cast_mut(),
-        //         LLVMCodeGenFileType::LLVMAssemblyFile, // object (binary) or assembly (textual)
-        //         error_buffer,
-        //     );
+        let filename = CString::new(
+            target_file
+                .with_extension("asm")
+                .as_os_str()
+                .to_string_lossy()
+                .as_bytes(),
+        )
+        .unwrap();
+        let ok = LLVMTargetMachineEmitToFile(
+            machine,
+            llvm_module,
+            filename.as_ptr().cast_mut(),
+            LLVMCodeGenFileType::LLVMAssemblyFile, // object (binary) or assembly (textual)
+            error_buffer,
+        );
 
-        //     if ok != 0 {
-        //         let error = CStr::from_ptr(*error_buffer);
-        //         let err = error.to_string_lossy().to_string();
-        //         tracing::error!("error emitting asm to file: {:?}", err);
-        //         LLVMDisposeMessage(*error_buffer);
-        //         Err(CodegenError::LLVMCompileError(err))?;
-        //     } else if !(*error_buffer).is_null() {
-        //         LLVMDisposeMessage(*error_buffer);
-        //     }
-        // }
+        if ok != 0 {
+            let error = CStr::from_ptr(*error_buffer);
+            let err = error.to_string_lossy().to_string();
+            LLVMDisposeMessage(*error_buffer);
+            Err(err)?;
+        } else if !(*error_buffer).is_null() {
+            LLVMDisposeMessage(*error_buffer);
+        }
 
         LLVMDisposeTargetMachine(machine);
         LLVMDisposeModule(llvm_module);
