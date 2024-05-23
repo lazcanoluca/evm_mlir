@@ -1,3 +1,6 @@
+use std::{ffi::CStr, mem::MaybeUninit, ptr::{addr_of_mut, null_mut}};
+
+use llvm_sys::{core::LLVMDisposeMessage, target_machine::{LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures, LLVMGetHostCPUName, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetRef}};
 use melior::{
     dialect::DialectRegistry,
     ir::{
@@ -38,7 +41,7 @@ impl Context {
         program: Vec<Opcode>,
     ) -> Result<MLIRModule, ()> {
         let location = Location::unknown(&self.melior_context);
-        // let target_triple = get_target_triple(session);
+        let target_triple = get_target_triple();
 
         let module_region = Region::new();
         module_region.append_block(Block::new(&[]));
@@ -118,4 +121,67 @@ pub fn initialize_mlir() -> MeliorContext {
     register_all_passes();
     register_all_llvm_translations(&context);
     context
+}
+
+pub fn get_target_triple() -> String {
+    let target_triple = unsafe {
+        let value = LLVMGetDefaultTargetTriple();
+        CStr::from_ptr(value).to_string_lossy().into_owned()
+    };
+    target_triple
+}
+
+pub fn get_data_layout_rep() -> Result<String, String> {
+    unsafe {
+        let mut null = null_mut();
+        let error_buffer = addr_of_mut!(null);
+
+        let target_triple = LLVMGetDefaultTargetTriple();
+
+        let target_cpu = LLVMGetHostCPUName();
+
+        let target_cpu_features = LLVMGetHostCPUFeatures();
+
+        let mut target: MaybeUninit<LLVMTargetRef> = MaybeUninit::uninit();
+
+        if LLVMGetTargetFromTriple(target_triple, target.as_mut_ptr(), error_buffer) != 0 {
+            let error = CStr::from_ptr(*error_buffer);
+            let err = error.to_string_lossy().to_string();
+            LLVMDisposeMessage(*error_buffer);
+            Err(err)?;
+        }
+        if !(*error_buffer).is_null() {
+            LLVMDisposeMessage(*error_buffer);
+        }
+
+        let target = target.assume_init();
+
+        let machine = LLVMCreateTargetMachine(
+            target,
+            target_triple.cast(),
+            target_cpu.cast(),
+            target_cpu_features.cast(),
+            // match session.optlevel {
+            //     OptLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+            //     OptLevel::Less => LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
+            //     OptLevel::Default => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+            //     OptLevel::Aggressive => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+            // },
+
+            LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+            // if session.library {
+            //     LLVMRelocMode::LLVMRelocDynamicNoPic
+            // } else {
+            //     LLVMRelocMode::LLVMRelocDefault
+            // },
+
+            LLVMRelocMode::LLVMRelocDefault,
+            LLVMCodeModel::LLVMCodeModelDefault,
+        );
+
+        let data_layout = llvm_sys::target_machine::LLVMCreateTargetDataLayout(machine);
+        let data_layout_str =
+            CStr::from_ptr(llvm_sys::target::LLVMCopyStringRepOfTargetData(data_layout));
+        Ok(data_layout_str.to_string_lossy().into_owned())
+    }
 }
