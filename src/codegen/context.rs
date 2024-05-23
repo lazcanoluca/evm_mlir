@@ -1,4 +1,5 @@
 use std::{
+    alloc::Layout,
     ffi::{CStr, CString},
     mem::MaybeUninit,
     path::PathBuf,
@@ -9,22 +10,32 @@ use llvm_sys::{
     core::{LLVMContextCreate, LLVMContextDispose, LLVMDisposeMessage, LLVMDisposeModule},
     error::LLVMGetErrorMessage,
     target_machine::{
-        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures, LLVMGetHostCPUName, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetMachineEmitToFile, LLVMTargetRef
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
+        LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures,
+        LLVMGetHostCPUName, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetMachineEmitToFile,
+        LLVMTargetRef,
     },
-    transforms::pass_builder::{LLVMCreatePassBuilderOptions, LLVMDisposePassBuilderOptions, LLVMRunPasses},
+    transforms::pass_builder::{
+        LLVMCreatePassBuilderOptions, LLVMDisposePassBuilderOptions, LLVMRunPasses,
+    },
 };
 use melior::{
-    dialect::DialectRegistry,
+    dialect::{arith, llvm, DialectRegistry},
     ir::{
-        attribute::StringAttribute, operation::OperationBuilder, Block, Identifier, Location,
-        Module as MeliorModule, Region,
+        attribute::{IntegerAttribute, StringAttribute},
+        operation::OperationBuilder,
+        r#type::IntegerType,
+        Block, Identifier, Location, Module as MeliorModule, Region,
     },
     utility::{register_all_dialects, register_all_llvm_translations, register_all_passes},
     Context as MeliorContext,
 };
 use mlir_sys::mlirTranslateModuleToLLVMIR;
 
-use crate::{codegen::run_pass_manager, opcodes::Opcode};
+use crate::{
+    codegen::run_pass_manager,
+    opcodes::{Opcode, Operation},
+};
 
 use super::module::MLIRModule;
 
@@ -48,12 +59,62 @@ impl Context {
         Self { melior_context }
     }
 
-    pub fn compile(&self, program: Vec<Opcode>) -> Result<MLIRModule, String> {
-        let location = Location::unknown(&self.melior_context);
+    pub fn compile(&self, _program: Vec<Operation>) -> Result<MLIRModule, String> {
         let target_triple = get_target_triple();
+        dbg!(target_triple.clone());
+        // let module_region = Region::new();
+        // module_region.append_block(Block::new(&[]));
+
+
+        let location = Location::unknown(&self.melior_context);
 
         let module_region = Region::new();
-        module_region.append_block(Block::new(&[]));
+        let block = Block::new(&[]);
+
+        let constant_1024 = block
+            .append_operation(arith::constant(
+                &self.melior_context,
+                IntegerAttribute::new(IntegerType::new(&self.melior_context, 64).into(), 1024)
+                    .into(),
+                location,
+            ))
+            .result(0)
+            .unwrap()
+            .into();
+
+        let result_layout = Layout::from_size_align(64, 8).unwrap();
+        // build a single push1 op
+        let _op = block
+            .append_operation(
+                OperationBuilder::new("llvm.alloca", location)
+                    .add_attributes(&[
+                        (
+                            Identifier::new(&self.melior_context, "alignment"),
+                            IntegerAttribute::new(
+                                IntegerType::new(&self.melior_context, 64).into(),
+                                result_layout.align().try_into().unwrap(),
+                            )
+                            .into(),
+                        ),
+                        (
+                            Identifier::new(&self.melior_context, "elem_type"),
+                            IntegerAttribute::new(
+                                IntegerType::new(&self.melior_context, 256).into(),
+                                result_layout.align().try_into().unwrap(),
+                            )
+                            .into(),
+                        ),
+                    ])
+                    .add_operands(&[constant_1024])
+                    .add_results(&[llvm::r#type::pointer(&self.melior_context, 0)])
+                    .build()
+                    .unwrap(),
+            )
+            .result(0)
+            .unwrap();
+        // .into();
+        module_region.append_block(block);
+
 
         let data_layout_ret = &get_data_layout_rep()?;
 
@@ -87,7 +148,16 @@ impl Context {
 
         // super::codegen::compile_program(codegen_ctx)?;
 
+
         assert!(melior_module.as_operation().verify());
+
+
+        dbg!(melior_module.as_operation().to_string());
+        std::fs::write(
+            PathBuf::from("generated.mlir"),
+            melior_module.as_operation().to_string(),
+        )
+        .unwrap();
 
         // TODO: Add proper error handling.
         run_pass_manager(&self.melior_context, &mut melior_module).unwrap();
@@ -142,8 +212,16 @@ pub fn get_data_layout_rep() -> Result<String, String> {
 
         let target_triple = LLVMGetDefaultTargetTriple();
 
+        {
+            let target_triple = unsafe {
+                let value = LLVMGetDefaultTargetTriple();
+                CStr::from_ptr(value).to_string_lossy().into_owned()
+            };
+            dbg!(target_triple.clone());
+            
+        }
         let target_cpu = LLVMGetHostCPUName();
-
+        dbg!(target_cpu.clone());
         let target_cpu_features = LLVMGetHostCPUFeatures();
 
         let mut target: MaybeUninit<LLVMTargetRef> = MaybeUninit::uninit();
@@ -151,6 +229,7 @@ pub fn get_data_layout_rep() -> Result<String, String> {
         if LLVMGetTargetFromTriple(target_triple, target.as_mut_ptr(), error_buffer) != 0 {
             let error = CStr::from_ptr(*error_buffer);
             let err = error.to_string_lossy().to_string();
+            dbg!(err.clone());
             LLVMDisposeMessage(*error_buffer);
             Err(err)?;
         }
@@ -348,4 +427,19 @@ pub fn compile_to_object(
 
         Ok(target_file)
     }
+}
+
+fn codegen_push1(context: &Context) -> Result<(), String> {
+    let location = Location::unknown(&context.melior_context);
+
+    let module_region = Region::new();
+    module_region.append_block(Block::new(&[]));
+
+    let op = OperationBuilder::new("builtin.push1", location)
+        .add_regions([module_region])
+        .build()
+        .map_err(|_| "failed to build push1 operation")?;
+    assert!(op.verify(), "push1 operation is not valid");
+
+    Ok(())
 }

@@ -15,3 +15,10 @@ impl From<u8> for Opcode {
         }
     }
 }
+
+
+pub enum Operation {
+    Stop,
+    // Add {}
+    Push1 { value: u8 },
+}

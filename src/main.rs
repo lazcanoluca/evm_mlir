@@ -1,3 +1,5 @@
+use evm_mlir::codegen::context::{self, compile_to_object};
+
 use crate::opcodes::Opcode;
 
 mod opcodes;
@@ -33,4 +35,26 @@ fn main() {
     }
     println!("Stack:");
     println!("{:?}", stack);
+
+
+    let context = context::Context::new();
+
+    dbg!("context created");    
+
+    let result = context.compile(Vec::new());
+
+    dbg!("compiled");
+
+    dbg!(result);
+    // ---> opcodes --> Context
+
+    // let context = Context::new()
+
+    // let module = context.compile(opcodes);
+
+    // compile_to_object(module);
+    // "exe"
+
+    // ./exe
+
 }
