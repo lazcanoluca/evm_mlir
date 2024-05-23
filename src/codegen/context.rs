@@ -198,6 +198,7 @@ pub fn compile_to_object(
     module: &MLIRModule<'_>,
 ) -> Result<PathBuf, String> {
     // TODO: put a proper target_file here
+    let target_file = PathBuf::from("output.o");
     // let target_file = session.output_file.with_extension("o");
 
     // TODO: Rework so you can specify target and host features, etc.
