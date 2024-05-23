@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use std::{
     alloc::Layout,
     ffi::{CStr, CString},
@@ -25,11 +26,11 @@ use llvm_sys::{
     },
 };
 use melior::{
-    dialect::{arith, llvm, DialectRegistry},
+    dialect::{arith, func, llvm, DialectRegistry},
     ir::{
         attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
         operation::OperationBuilder,
-        r#type::IntegerType,
+        r#type::{FunctionType, IntegerType},
         Block, Identifier, Location, Module as MeliorModule, Region,
     },
     utility::{register_all_dialects, register_all_llvm_translations, register_all_passes},
@@ -74,54 +75,73 @@ impl Context {
         });
 
         let target_triple = get_target_triple();
-        dbg!(target_triple.clone());
-        // let module_region = Region::new();
-        // module_region.append_block(Block::new(&[]));
 
-        let location = Location::unknown(&self.melior_context);
+        let context = &self.melior_context;
 
-        let module_region = Region::new();
-        let block = Block::new(&[]);
-        // build a single push1 op
+        let location = Location::unknown(context);
 
-        let constant_1024 = block
+        let uint256 = IntegerType::new(context, 256);
+
+        // Build a single region with a single block with a constant and a return operation
+        let func_region = Region::new();
+        let func_block = Block::new(&[]);
+
+        let constant_1024 = func_block
             .append_operation(arith::constant(
-                &self.melior_context,
-                IntegerAttribute::new(IntegerType::new(&self.melior_context, 64).into(), 1024)
-                    .into(),
+                context,
+                IntegerAttribute::new(uint256.into(), 42).into(),
                 location,
             ))
             .result(0)
             .unwrap()
             .into();
 
-        let result_layout = Layout::from_size_align(64, 8).unwrap();
-        let _op = block
-            .append_operation(
-                OperationBuilder::new("llvm.alloca", location)
-                    .add_attributes(&[
-                        (
-                            Identifier::new(&self.melior_context, "alignment"),
-                            IntegerAttribute::new(
-                                IntegerType::new(&self.melior_context, 64).into(),
-                                result_layout.align().try_into().unwrap(),
-                            )
-                            .into(),
-                        ),
-                        (
-                            Identifier::new(&self.melior_context, "elem_type"),
-                            TypeAttribute::new(IntegerType::new(&self.melior_context, 256).into())
-                                .into(),
-                        ),
-                    ])
-                    .add_operands(&[constant_1024])
-                    .add_results(&[llvm::r#type::pointer(&self.melior_context, 0)])
-                    .build()
-                    .unwrap(),
+        // let result_layout = Layout::from_size_align(64, 8).unwrap();
+        // let _op = block
+        //     .append_operation(
+        //         OperationBuilder::new("llvm.alloca", location)
+        //             .add_attributes(&[
+        //                 (
+        //                     Identifier::new(context, "alignment"),
+        //                     IntegerAttribute::new(
+        //                         IntegerType::new(context, 64).into(),
+        //                         result_layout.align().try_into().unwrap(),
+        //                     )
+        //                     .into(),
+        //                 ),
+        //                 (
+        //                     Identifier::new(context, "elem_type"),
+        //                     TypeAttribute::new(IntegerType::new(context, 256).into())
+        //                         .into(),
+        //                 ),
+        //             ])
+        //             .add_operands(&[constant_1024])
+        //             .add_results(&[llvm::r#type::pointer(context, 0)])
+        //             .build()
+        //             .unwrap(),
+        //     )
+        //     .result(0)
+        //     .unwrap();
+        func_block.append_operation(func::r#return(&[constant_1024], Location::unknown(context)));
+        func_region.append_block(func_block);
+
+        // Build a module with a single function
+        let module_region = Region::new();
+        let module_block = Block::new(&[]);
+
+        module_block.append_operation(
+            func::func(
+                context,
+                StringAttribute::new(context, "main"),
+                TypeAttribute::new(FunctionType::new(context, &[], &[uint256.into()]).into()),
+                func_region,
+                &[],
+                Location::unknown(context),
             )
-            .result(0)
-            .unwrap();
-        module_region.append_block(block);
+            .into(),
+        );
+
+        module_region.append_block(module_block);
 
         let data_layout_ret = &get_data_layout_rep()?;
 
@@ -129,12 +149,12 @@ impl Context {
         let op = OperationBuilder::new("builtin.module", location)
             .add_attributes(&[
                 (
-                    Identifier::new(&self.melior_context, "llvm.target_triple"),
-                    StringAttribute::new(&self.melior_context, &target_triple).into(),
+                    Identifier::new(context, "llvm.target_triple"),
+                    StringAttribute::new(context, &target_triple).into(),
                 ),
                 (
-                    Identifier::new(&self.melior_context, "llvm.data_layout"),
-                    StringAttribute::new(&self.melior_context, data_layout_ret).into(),
+                    Identifier::new(context, "llvm.data_layout"),
+                    StringAttribute::new(context, data_layout_ret).into(),
                 ),
             ])
             .add_regions([module_region])
@@ -147,7 +167,7 @@ impl Context {
         // TODO: here we should wire the call to the specific code generation for each opcode
 
         // let codegen_ctx = CodegenCtx {
-        //     mlir_context: &self.melior_context,
+        //     mlir_context: context,
         //     session,
         //     mlir_module: &melior_module,
         //     program,
@@ -165,7 +185,7 @@ impl Context {
         .unwrap();
 
         // TODO: Add proper error handling.
-        run_pass_manager(&self.melior_context, &mut melior_module).unwrap();
+        run_pass_manager(context, &mut melior_module).unwrap();
 
         // The func to llvm pass has a bug where it sets the data layout string to ""
         // This works around it by setting it again.
@@ -173,7 +193,7 @@ impl Context {
             let mut op = melior_module.as_operation_mut();
             op.set_attribute(
                 "llvm.data_layout",
-                StringAttribute::new(&self.melior_context, data_layout_ret).into(),
+                StringAttribute::new(context, data_layout_ret).into(),
             );
         }
 
@@ -222,10 +242,8 @@ pub fn get_data_layout_rep() -> Result<String, String> {
                 let value = LLVMGetDefaultTargetTriple();
                 CStr::from_ptr(value).to_string_lossy().into_owned()
             };
-            dbg!(target_triple.clone());
         }
         let target_cpu = LLVMGetHostCPUName();
-        dbg!(target_cpu.clone());
         let target_cpu_features = LLVMGetHostCPUFeatures();
 
         let mut target: MaybeUninit<LLVMTargetRef> = MaybeUninit::uninit();
@@ -281,7 +299,7 @@ pub fn compile_to_object(
     module: &MLIRModule<'_>,
 ) -> Result<PathBuf, String> {
     // TODO: put a proper target_file here
-    let target_file = PathBuf::from("output.s");
+    let target_file = PathBuf::from("output.o");
     // let target_file = session.output_file.with_extension("o");
 
     // TODO: Rework so you can specify target and host features, etc.
