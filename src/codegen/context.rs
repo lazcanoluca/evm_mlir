@@ -1,6 +1,18 @@
-use std::{ffi::CStr, mem::MaybeUninit, ptr::{addr_of_mut, null_mut}};
+use std::{
+    ffi::{CStr, CString},
+    mem::MaybeUninit,
+    path::PathBuf,
+    ptr::{addr_of_mut, null_mut},
+};
 
-use llvm_sys::{core::LLVMDisposeMessage, target_machine::{LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures, LLVMGetHostCPUName, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetRef}};
+use llvm_sys::{
+    core::{LLVMContextCreate, LLVMContextDispose, LLVMDisposeMessage, LLVMDisposeModule},
+    error::LLVMGetErrorMessage,
+    target_machine::{
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures, LLVMGetHostCPUName, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetMachineEmitToFile, LLVMTargetRef
+    },
+    transforms::pass_builder::{LLVMCreatePassBuilderOptions, LLVMDisposePassBuilderOptions, LLVMRunPasses},
+};
 use melior::{
     dialect::DialectRegistry,
     ir::{
@@ -10,6 +22,7 @@ use melior::{
     utility::{register_all_dialects, register_all_llvm_translations, register_all_passes},
     Context as MeliorContext,
 };
+use mlir_sys::mlirTranslateModuleToLLVMIR;
 
 use crate::{codegen::run_pass_manager, opcodes::Opcode};
 
@@ -35,10 +48,7 @@ impl Context {
         Self { melior_context }
     }
 
-    pub fn compile(
-        &self,
-        program: Vec<Opcode>,
-    ) -> Result<MLIRModule, String> {
+    pub fn compile(&self, program: Vec<Opcode>) -> Result<MLIRModule, String> {
         let location = Location::unknown(&self.melior_context);
         let target_triple = get_target_triple();
 
@@ -60,7 +70,8 @@ impl Context {
                 ),
             ])
             .add_regions([module_region])
-            .build().map_err(|_| "failed to build module operation")?;
+            .build()
+            .map_err(|_| "failed to build module operation")?;
         assert!(op.verify(), "module operation is not valid");
 
         let mut melior_module = MeliorModule::from_operation(op).expect("module failed to create");
@@ -101,7 +112,6 @@ impl Context {
         Ok(MLIRModule::new(melior_module))
     }
 }
-
 
 /// Initialize an MLIR context.
 pub fn initialize_mlir() -> MeliorContext {
@@ -161,14 +171,12 @@ pub fn get_data_layout_rep() -> Result<String, String> {
             //     OptLevel::Default => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
             //     OptLevel::Aggressive => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
             // },
-
             LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
             // if session.library {
             //     LLVMRelocMode::LLVMRelocDynamicNoPic
             // } else {
             //     LLVMRelocMode::LLVMRelocDefault
             // },
-
             LLVMRelocMode::LLVMRelocDefault,
             LLVMCodeModel::LLVMCodeModelDefault,
         );
@@ -177,5 +185,166 @@ pub fn get_data_layout_rep() -> Result<String, String> {
         let data_layout_str =
             CStr::from_ptr(llvm_sys::target::LLVMCopyStringRepOfTargetData(data_layout));
         Ok(data_layout_str.to_string_lossy().into_owned())
+    }
+}
+
+/// Converts a module to an object.
+/// The object will be written to the specified target path.
+/// TODO: error handling
+///
+/// Returns the path to the object.
+pub fn compile_to_object(
+    // session: &Session,
+    module: &MLIRModule<'_>,
+) -> Result<PathBuf, String> {
+    // TODO: put a proper target_file here
+    // let target_file = session.output_file.with_extension("o");
+
+    // TODO: Rework so you can specify target and host features, etc.
+    // Right now it compiles for the native cpu feature set and arch
+
+    unsafe {
+        let llvm_context = LLVMContextCreate();
+
+        let op = module.melior_module.as_operation().to_raw();
+
+        let llvm_module = mlirTranslateModuleToLLVMIR(op, llvm_context as *mut _) as *mut _;
+
+        let mut null = null_mut();
+        let mut error_buffer = addr_of_mut!(null);
+
+        let target_triple = LLVMGetDefaultTargetTriple();
+
+        let target_cpu = LLVMGetHostCPUName();
+
+        let target_cpu_features = LLVMGetHostCPUFeatures();
+
+        let mut target: MaybeUninit<LLVMTargetRef> = MaybeUninit::uninit();
+
+        if LLVMGetTargetFromTriple(target_triple, target.as_mut_ptr(), error_buffer) != 0 {
+            let error = CStr::from_ptr(*error_buffer);
+            let err = error.to_string_lossy().to_string();
+            LLVMDisposeMessage(*error_buffer);
+            Err(err)?;
+        } else if !(*error_buffer).is_null() {
+            LLVMDisposeMessage(*error_buffer);
+            error_buffer = addr_of_mut!(null);
+        }
+
+        let target = target.assume_init();
+
+        let machine = LLVMCreateTargetMachine(
+            target,
+            target_triple.cast(),
+            target_cpu.cast(),
+            target_cpu_features.cast(),
+            // match session.optlevel {
+            //     OptLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+            //     OptLevel::Less => LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
+            //     OptLevel::Default => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+            //     OptLevel::Aggressive => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+            // },
+            LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+            // if session.library {
+            //     LLVMRelocMode::LLVMRelocDynamicNoPic
+            // } else {
+            //     LLVMRelocMode::LLVMRelocDefault
+            // },
+            LLVMRelocMode::LLVMRelocDefault,
+            LLVMCodeModel::LLVMCodeModelDefault,
+        );
+
+        let opts = LLVMCreatePassBuilderOptions();
+        // let opt = match session.optlevel {
+        //     OptLevel::None => 0,
+        //     OptLevel::Less => 1,
+        //     OptLevel::Default => 2,
+        //     OptLevel::Aggressive => 3,
+        // };
+        let opt = 0;
+        let passes = CString::new(format!("default<O{opt}>")).unwrap();
+        let error = LLVMRunPasses(llvm_module as *mut _, passes.as_ptr(), machine, opts);
+        if !error.is_null() {
+            let msg = LLVMGetErrorMessage(error);
+            let msg = CStr::from_ptr(msg);
+            Err(msg.to_string_lossy().into_owned())?;
+        }
+
+        LLVMDisposePassBuilderOptions(opts);
+
+        // if session.output_ll {
+        //     let filename = CString::new(
+        //         target_file
+        //             .with_extension("ll")
+        //             .as_os_str()
+        //             .to_string_lossy()
+        //             .as_bytes(),
+        //     )
+        //     .unwrap();
+        //     if LLVMPrintModuleToFile(llvm_module, filename.as_ptr(), error_buffer) != 0 {
+        //         let error = CStr::from_ptr(*error_buffer);
+        //         let err = error.to_string_lossy().to_string();
+        //         tracing::error!("error outputing ll file: {}", err);
+        //         LLVMDisposeMessage(*error_buffer);
+        //         Err(CodegenError::LLVMCompileError(err))?;
+        //     } else if !(*error_buffer).is_null() {
+        //         LLVMDisposeMessage(*error_buffer);
+        //         error_buffer = addr_of_mut!(null);
+        //     }
+        // }
+
+        let filename = CString::new(target_file.as_os_str().to_string_lossy().as_bytes()).unwrap();
+        // tracing::debug!("filename to llvm: {:?}", filename);
+        let ok = LLVMTargetMachineEmitToFile(
+            machine,
+            llvm_module,
+            filename.as_ptr().cast_mut(),
+            LLVMCodeGenFileType::LLVMObjectFile, // object (binary) or assembly (textual)
+            error_buffer,
+        );
+
+        if ok != 0 {
+            let error = CStr::from_ptr(*error_buffer);
+            let err = error.to_string_lossy().to_string();
+            // tracing::error!("error emitting to file: {:?}", err);
+            LLVMDisposeMessage(*error_buffer);
+            Err(err)?;
+        } else if !(*error_buffer).is_null() {
+            LLVMDisposeMessage(*error_buffer);
+        }
+
+        // if session.output_asm {
+        //     let filename = CString::new(
+        //         target_file
+        //             .with_extension("asm")
+        //             .as_os_str()
+        //             .to_string_lossy()
+        //             .as_bytes(),
+        //     )
+        //     .unwrap();
+        //     let ok = LLVMTargetMachineEmitToFile(
+        //         machine,
+        //         llvm_module,
+        //         filename.as_ptr().cast_mut(),
+        //         LLVMCodeGenFileType::LLVMAssemblyFile, // object (binary) or assembly (textual)
+        //         error_buffer,
+        //     );
+
+        //     if ok != 0 {
+        //         let error = CStr::from_ptr(*error_buffer);
+        //         let err = error.to_string_lossy().to_string();
+        //         tracing::error!("error emitting asm to file: {:?}", err);
+        //         LLVMDisposeMessage(*error_buffer);
+        //         Err(CodegenError::LLVMCompileError(err))?;
+        //     } else if !(*error_buffer).is_null() {
+        //         LLVMDisposeMessage(*error_buffer);
+        //     }
+        // }
+
+        LLVMDisposeTargetMachine(machine);
+        LLVMDisposeModule(llvm_module);
+        LLVMContextDispose(llvm_context);
+
+        Ok(target_file)
     }
 }
