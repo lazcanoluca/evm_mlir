@@ -1,11 +1,5 @@
-use std::{fs::read_to_string, path::PathBuf};
-
-use evm_mlir::codegen::{
-    context::{self, compile_to_object},
-    module::MLIRModule,
-};
-
-use crate::opcodes::Opcode;
+use evm_mlir::codegen::context::{self, compile_to_object};
+use std::path::PathBuf;
 
 mod opcodes;
 
@@ -43,15 +37,22 @@ fn main() {
 
     let context = context::Context::new();
 
-    dbg!("context created");
+    println!("Creating MLIR module");
 
     let result = context.compile(Vec::new()).unwrap();
 
-    dbg!("compiled");
-
-    let source_code = read_to_string(PathBuf::from("generated.mlir.bak")).unwrap();
+    println!("Compiling with LLVM");
 
     let object_file = compile_to_object(&result).unwrap();
+
+    println!("Linking...");
+
+    link_binary(object_file);
+
+    println!("Done!");
+}
+
+fn link_binary(object_file: PathBuf) {
     let args = vec![
         "-L/usr/local/lib",
         "-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib",

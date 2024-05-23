@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub enum Opcode {
     STOP = 0x00,
     ADD = 0x01,

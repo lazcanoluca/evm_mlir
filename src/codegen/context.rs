@@ -197,12 +197,8 @@ impl Context {
             );
         }
 
-        // if session.output_mlir {
-        //     std::fs::write(
-        //         session.output_file.with_extension("after-pass.mlir"),
-        //         melior_module.as_operation().to_string(),
-        //     )?;
-        // }
+        // Output MLIR
+        std::fs::write("after-pass.mlir", melior_module.as_operation().to_string()).unwrap();
 
         Ok(MLIRModule::new(melior_module))
     }
