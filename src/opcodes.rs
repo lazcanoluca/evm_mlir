@@ -4,6 +4,7 @@ pub enum Opcode {
     STOP = 0x00,
     ADD = 0x01,
     PUSH1 = 0x60,
+    PUSH32 = 0x7F,
     UNUSED,
 }
 
@@ -13,6 +14,7 @@ impl From<u8> for Opcode {
             0x00 => Opcode::STOP,
             0x01 => Opcode::ADD,
             0x60 => Opcode::PUSH1,
+            0x7F => Opcode::PUSH32,
             _ => Opcode::UNUSED,
         }
     }
@@ -22,6 +24,7 @@ pub enum Operation {
     Stop,
     Add,
     Push1(u8),
+    Push32([u8; 32]),
 }
 
 impl Operation {
@@ -40,6 +43,12 @@ impl Operation {
                     i += 1;
                     let x = bytecode[i];
                     Operation::Push1(x)
+                }
+                Opcode::PUSH32 => {
+                    i += 1;
+                    let x = bytecode[i..(i + 32)].try_into().unwrap();
+                    i += 31;
+                    Operation::Push32(x)
                 }
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };

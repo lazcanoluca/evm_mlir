@@ -26,22 +26,23 @@ use llvm_sys::{
     },
 };
 use melior::{
-    dialect::{arith, func, llvm, DialectRegistry},
+    dialect::{
+        arith, func,
+        llvm::{self, r#type::pointer, AllocaOptions, LoadStoreOptions},
+        DialectRegistry,
+    },
     ir::{
         attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
         operation::OperationBuilder,
         r#type::{FunctionType, IntegerType},
-        Block, Identifier, Location, Module as MeliorModule, Region,
+        Block, Identifier, Location, Region,
     },
-    utility::{register_all_dialects, register_all_llvm_translations, register_all_passes},
+    utility::{register_all_dialects, register_all_llvm_translations},
     Context as MeliorContext,
 };
 use mlir_sys::mlirTranslateModuleToLLVMIR;
 
-use crate::{
-    codegen::run_pass_manager,
-    opcodes::{Opcode, Operation},
-};
+use crate::{codegen::run_pass_manager, opcodes::Operation};
 
 use super::module::MLIRModule;
 
@@ -65,7 +66,7 @@ impl Context {
         Self { melior_context }
     }
 
-    pub fn compile(&self, _program: Vec<Operation>) -> Result<MLIRModule, String> {
+    pub fn compile(&self, program: Vec<Operation>) -> Result<MLIRModule, String> {
         static INITIALIZED: OnceLock<()> = OnceLock::new();
         INITIALIZED.get_or_init(|| unsafe {
             LLVM_InitializeAllTargets();
@@ -78,75 +79,19 @@ impl Context {
 
         let context = &self.melior_context;
 
-        let location = Location::unknown(context);
-
-        let uint256 = IntegerType::new(context, 256);
-
-        // Build a single region with a single block with a constant and a return operation
-        let func_region = Region::new();
-        let func_block = Block::new(&[]);
-
-        let constant_1024 = func_block
-            .append_operation(arith::constant(
-                context,
-                IntegerAttribute::new(uint256.into(), 42).into(),
-                location,
-            ))
-            .result(0)
-            .unwrap()
-            .into();
-
-        // let result_layout = Layout::from_size_align(64, 8).unwrap();
-        // let _op = block
-        //     .append_operation(
-        //         OperationBuilder::new("llvm.alloca", location)
-        //             .add_attributes(&[
-        //                 (
-        //                     Identifier::new(context, "alignment"),
-        //                     IntegerAttribute::new(
-        //                         IntegerType::new(context, 64).into(),
-        //                         result_layout.align().try_into().unwrap(),
-        //                     )
-        //                     .into(),
-        //                 ),
-        //                 (
-        //                     Identifier::new(context, "elem_type"),
-        //                     TypeAttribute::new(IntegerType::new(context, 256).into())
-        //                         .into(),
-        //                 ),
-        //             ])
-        //             .add_operands(&[constant_1024])
-        //             .add_results(&[llvm::r#type::pointer(context, 0)])
-        //             .build()
-        //             .unwrap(),
-        //     )
-        //     .result(0)
-        //     .unwrap();
-        func_block.append_operation(func::r#return(&[constant_1024], Location::unknown(context)));
-        func_region.append_block(func_block);
+        let main_func = compile_program(context, program);
 
         // Build a module with a single function
         let module_region = Region::new();
         let module_block = Block::new(&[]);
 
-        module_block.append_operation(
-            func::func(
-                context,
-                StringAttribute::new(context, "main"),
-                TypeAttribute::new(FunctionType::new(context, &[], &[uint256.into()]).into()),
-                func_region,
-                &[],
-                Location::unknown(context),
-            )
-            .into(),
-        );
-
+        module_block.append_operation(main_func);
         module_region.append_block(module_block);
 
         let data_layout_ret = &get_data_layout_rep()?;
 
         // build main module
-        let op = OperationBuilder::new("builtin.module", location)
+        let op = OperationBuilder::new("builtin.module", Location::unknown(&context))
             .add_attributes(&[
                 (
                     Identifier::new(context, "llvm.target_triple"),
@@ -164,20 +109,8 @@ impl Context {
 
         let mut melior_module = MeliorModule::from_operation(op).expect("module failed to create");
 
-        // TODO: here we should wire the call to the specific code generation for each opcode
-
-        // let codegen_ctx = CodegenCtx {
-        //     mlir_context: context,
-        //     session,
-        //     mlir_module: &melior_module,
-        //     program,
-        // };
-
-        // super::codegen::compile_program(codegen_ctx)?;
-
         assert!(melior_module.as_operation().verify());
 
-        dbg!(melior_module.as_operation().to_string());
         std::fs::write(
             PathBuf::from("generated.mlir"),
             melior_module.as_operation().to_string(),
@@ -232,13 +165,6 @@ pub fn get_data_layout_rep() -> Result<String, String> {
         let error_buffer = addr_of_mut!(null);
 
         let target_triple = LLVMGetDefaultTargetTriple();
-
-        {
-            let target_triple = unsafe {
-                let value = LLVMGetDefaultTargetTriple();
-                CStr::from_ptr(value).to_string_lossy().into_owned()
-            };
-        }
         let target_cpu = LLVMGetHostCPUName();
         let target_cpu_features = LLVMGetHostCPUFeatures();
 
@@ -444,17 +370,88 @@ pub fn compile_to_object(
     }
 }
 
-fn codegen_push1(context: &Context) -> Result<(), String> {
-    let location = Location::unknown(&context.melior_context);
+fn compile_program(context: &MeliorContext, operations: Vec<Operation>) -> melior::ir::Operation {
+    let location = Location::unknown(context);
+
+    let uint256 = IntegerType::new(context, 256);
+
+    // Build a single region with a single block with a constant and a return operation
+    let main_region = Region::new();
+    let main_block = Block::new(&[]);
+
+    let constant_1024 = main_block
+        .append_operation(arith::constant(
+            context,
+            IntegerAttribute::new(uint256.into(), 1024).into(),
+            location,
+        ))
+        .result(0)
+        .unwrap()
+        .into();
+
+    let ptr = main_block
+        .append_operation(llvm::alloca(
+            context,
+            constant_1024,
+            pointer(context, 0),
+            location,
+            AllocaOptions::new().elem_type(Some(TypeAttribute::new(uint256.into()))),
+        ))
+        .result(0)
+        .unwrap()
+        .into();
+
+    let op = main_block.append_operation(llvm::store(
+        context,
+        constant_1024,
+        ptr,
+        location,
+        LoadStoreOptions::new(),
+    ));
+
+    assert!(op.verify(), "store operation is invalid");
+
+    let value = main_block
+        .append_operation(llvm::load(
+            context,
+            ptr,
+            uint256.into(),
+            location,
+            LoadStoreOptions::new(),
+        ))
+        .result(0)
+        .unwrap()
+        .into();
+    for op in operations {
+        match op {
+            Operation::Push32(x) => {
+                codegen_push(&context, x).unwrap();
+            }
+            _ => todo!(),
+        }
+    }
+
+    main_block.append_operation(func::r#return(&[value], location));
+    main_region.append_block(main_block);
+
+    func::func(
+        context,
+        StringAttribute::new(context, "main"),
+        TypeAttribute::new(FunctionType::new(context, &[], &[uint256.into()]).into()),
+        main_region,
+        &[],
+        location,
+    )
+    .into()
+}
+
+fn codegen_push(context: &MeliorContext, value: [u8; 32]) -> Result<(), String> {
+    let location = Location::unknown(&context);
 
     let module_region = Region::new();
     module_region.append_block(Block::new(&[]));
 
-    let op = OperationBuilder::new("builtin.push1", location)
-        .add_regions([module_region])
-        .build()
-        .map_err(|_| "failed to build push1 operation")?;
-    assert!(op.verify(), "push1 operation is not valid");
+    // TODO: add PUSH32 operation code
 
     Ok(())
 }
