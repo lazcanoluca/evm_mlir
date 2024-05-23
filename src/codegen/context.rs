@@ -37,16 +37,15 @@ impl Context {
 
     pub fn compile(
         &self,
-        // session: &Session,
         program: Vec<Opcode>,
-    ) -> Result<MLIRModule, ()> {
+    ) -> Result<MLIRModule, String> {
         let location = Location::unknown(&self.melior_context);
         let target_triple = get_target_triple();
 
         let module_region = Region::new();
         module_region.append_block(Block::new(&[]));
 
-        // let data_layout_ret = &get_data_layout_rep(session)?;
+        let data_layout_ret = &get_data_layout_rep()?;
 
         // build main module
         let op = OperationBuilder::new("builtin.module", location)
@@ -61,10 +60,12 @@ impl Context {
                 ),
             ])
             .add_regions([module_region])
-            .build()?;
+            .build().map_err(|_| "failed to build module operation")?;
         assert!(op.verify(), "module operation is not valid");
 
         let mut melior_module = MeliorModule::from_operation(op).expect("module failed to create");
+
+        // TODO: here we should wire the call to the specific code generation for each opcode
 
         // let codegen_ctx = CodegenCtx {
         //     mlir_context: &self.melior_context,
@@ -74,13 +75,6 @@ impl Context {
         // };
 
         // super::codegen::compile_program(codegen_ctx)?;
-
-        // if session.output_mlir {
-        //     std::fs::write(
-        //         session.output_file.with_extension("before-pass.mlir"),
-        //         melior_module.as_operation().to_string(),
-        //     )?;
-        // }
 
         assert!(melior_module.as_operation().verify());
 
