@@ -4,12 +4,12 @@ use melior::{
     Context as MeliorContext,
 };
 
-use crate::constants::STACK_GLOBAL_VAR;
+use crate::{constants::STACK_GLOBAL_VAR, errors::CodegenError};
 
 pub fn load_from_stack<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
-) -> Value<'ctx, 'ctx> {
+) -> Result<Value<'ctx, 'ctx>, CodegenError> {
     let uint256 = IntegerType::new(context, 256);
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
@@ -20,8 +20,7 @@ pub fn load_from_stack<'ctx>(
             ptr_type,
             location,
         ))
-        .result(0)
-        .unwrap();
+        .result(0)?;
 
     let stack_baseptr = block
         .append_operation(llvm::load(
@@ -31,10 +30,9 @@ pub fn load_from_stack<'ctx>(
             location,
             LoadStoreOptions::default(),
         ))
-        .result(0)
-        .unwrap();
+        .result(0)?;
 
-    block
+    let value = block
         .append_operation(llvm::load(
             context,
             stack_baseptr.into(),
@@ -42,12 +40,16 @@ pub fn load_from_stack<'ctx>(
             location,
             LoadStoreOptions::default(),
         ))
-        .result(0)
-        .unwrap()
-        .into()
+        .result(0)?
+        .into();
+    Ok(value)
 }
 
-pub fn store_in_stack<'ctx>(context: &'ctx MeliorContext, block: &'ctx Block, value: Value) {
+pub fn store_in_stack<'ctx>(
+    context: &'ctx MeliorContext,
+    block: &'ctx Block,
+    value: Value,
+) -> Result<(), CodegenError> {
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
     let stack_baseptr_ptr = block
@@ -57,8 +59,7 @@ pub fn store_in_stack<'ctx>(context: &'ctx MeliorContext, block: &'ctx Block, va
             ptr_type,
             location,
         ))
-        .result(0)
-        .unwrap();
+        .result(0)?;
 
     let stack_baseptr = block
         .append_operation(llvm::load(
@@ -68,8 +69,7 @@ pub fn store_in_stack<'ctx>(context: &'ctx MeliorContext, block: &'ctx Block, va
             location,
             LoadStoreOptions::default(),
         ))
-        .result(0)
-        .unwrap();
+        .result(0)?;
 
     let res = block.append_operation(llvm::store(
         context,
@@ -80,6 +80,7 @@ pub fn store_in_stack<'ctx>(context: &'ctx MeliorContext, block: &'ctx Block, va
     ));
 
     assert!(res.verify());
+    Ok(())
 }
 
 pub mod llvm_mlir {

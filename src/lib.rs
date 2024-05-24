@@ -6,6 +6,7 @@ use std::{
     sync::OnceLock,
 };
 
+use errors::CodegenError;
 use llvm_sys::{
     core::{
         LLVMContextCreate, LLVMContextDispose, LLVMDisposeMessage, LLVMDisposeModule,
@@ -40,7 +41,7 @@ pub mod module;
 pub mod opcodes;
 pub mod utils;
 
-pub fn compile(program: Vec<Operation>) -> PathBuf {
+pub fn compile(program: Vec<Operation>) -> Result<PathBuf, CodegenError> {
     static INITIALIZED: OnceLock<()> = OnceLock::new();
     INITIALIZED.get_or_init(|| unsafe {
         LLVM_InitializeAllTargets();
@@ -49,9 +50,8 @@ pub fn compile(program: Vec<Operation>) -> PathBuf {
         LLVM_InitializeAllAsmPrinters();
     });
     let context = Context::new();
-    let mlir_module = context.compile(&program).unwrap();
-    let object_path = compile_to_object(&mlir_module).unwrap();
-    object_path
+    let mlir_module = context.compile(&program)?;
+    compile_to_object(&mlir_module)
 }
 
 /// Converts a module to an object.
@@ -60,7 +60,7 @@ pub fn compile(program: Vec<Operation>) -> PathBuf {
 ///
 /// Returns the path to the object.
 // TODO: pass options to the function
-pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
+pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, CodegenError> {
     // TODO: put a proper target_file here
     let target_file = PathBuf::from("output.o");
     // let target_file = session.output_file.with_extension("o");
@@ -89,7 +89,7 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
             let error = CStr::from_ptr(*error_buffer);
             let err = error.to_string_lossy().to_string();
             LLVMDisposeMessage(*error_buffer);
-            Err(err)?;
+            return Err(CodegenError::LLVMCompileError(err));
         } else if !(*error_buffer).is_null() {
             LLVMDisposeMessage(*error_buffer);
             error_buffer = addr_of_mut!(null);
@@ -114,7 +114,9 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
         if !error.is_null() {
             let msg = LLVMGetErrorMessage(error);
             let msg = CStr::from_ptr(msg);
-            Err(msg.to_string_lossy().into_owned())?;
+            return Err(CodegenError::LLVMCompileError(
+                msg.to_string_lossy().into_owned(),
+            ));
         }
 
         LLVMDisposePassBuilderOptions(opts);
@@ -132,7 +134,7 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
             let error = CStr::from_ptr(*error_buffer);
             let err = error.to_string_lossy().to_string();
             LLVMDisposeMessage(*error_buffer);
-            Err(err)?;
+            return Err(CodegenError::LLVMCompileError(err));
         } else if !(*error_buffer).is_null() {
             LLVMDisposeMessage(*error_buffer);
             error_buffer = addr_of_mut!(null);
@@ -152,7 +154,7 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
             let error = CStr::from_ptr(*error_buffer);
             let err = error.to_string_lossy().to_string();
             LLVMDisposeMessage(*error_buffer);
-            Err(err)?;
+            return Err(CodegenError::LLVMCompileError(err));
         } else if !(*error_buffer).is_null() {
             LLVMDisposeMessage(*error_buffer);
         }
@@ -178,7 +180,7 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
             let error = CStr::from_ptr(*error_buffer);
             let err = error.to_string_lossy().to_string();
             LLVMDisposeMessage(*error_buffer);
-            Err(err)?;
+            return Err(CodegenError::LLVMCompileError(err));
         } else if !(*error_buffer).is_null() {
             LLVMDisposeMessage(*error_buffer);
         }
@@ -207,7 +209,11 @@ pub fn link_binary(object_file: impl AsRef<Path>, output_file: impl AsRef<Path>)
     assert!(output.status.success());
 }
 
-pub fn compile_binary(program: Vec<Operation>, output_file: impl AsRef<Path>) {
-    let object_file = compile(program);
+pub fn compile_binary(
+    program: Vec<Operation>,
+    output_file: impl AsRef<Path>,
+) -> Result<(), CodegenError> {
+    let object_file = compile(program)?;
     link_binary(object_file, &output_file);
+    Ok(())
 }

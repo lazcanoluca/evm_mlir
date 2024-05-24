@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use llvm_sys::{
     core::LLVMDisposeMessage,
     target_machine::{
@@ -32,6 +31,7 @@ use std::{
 use crate::{
     codegen::{context::CodegenCtx, operations::generate_code_for_op, run_pass_manager},
     constants::{MAX_STACK_ELEMENTS, STACK_GLOBAL_VAR},
+    errors::CodegenError,
     module::MLIRModule,
     opcodes::Operation,
     utils::{llvm_mlir, load_from_stack},
@@ -57,7 +57,7 @@ impl Context {
         Self { melior_context }
     }
 
-    pub fn compile(&self, program: &[Operation]) -> Result<MLIRModule, String> {
+    pub fn compile(&self, program: &[Operation]) -> Result<MLIRModule, CodegenError> {
         let target_triple = get_target_triple();
 
         let context = &self.melior_context;
@@ -83,8 +83,7 @@ impl Context {
                 ),
             ])
             .add_regions([module_region])
-            .build()
-            .map_err(|_| "failed to build module operation")?;
+            .build()?;
         assert!(op.verify(), "module operation is not valid");
 
         let mut melior_module = MeliorModule::from_operation(op).expect("module failed to create");
@@ -92,21 +91,20 @@ impl Context {
         let codegen_ctx = CodegenCtx {
             mlir_context: &self.melior_context,
             mlir_module: &melior_module,
-            program: &program,
+            program,
         };
 
-        compile_program(codegen_ctx);
+        compile_program(codegen_ctx)?;
 
         assert!(melior_module.as_operation().verify());
 
         std::fs::write(
             PathBuf::from("generated.mlir"),
             melior_module.as_operation().to_string(),
-        )
-        .unwrap();
+        )?;
 
         // TODO: Add proper error handling.
-        run_pass_manager(context, &mut melior_module).unwrap();
+        run_pass_manager(context, &mut melior_module)?;
 
         // The func to llvm pass has a bug where it sets the data layout string to ""
         // This works around it by setting it again.
@@ -119,7 +117,7 @@ impl Context {
         }
 
         // Output MLIR
-        std::fs::write("after-pass.mlir", melior_module.as_operation().to_string()).unwrap();
+        std::fs::write("after-pass.mlir", melior_module.as_operation().to_string())?;
 
         Ok(MLIRModule::new(melior_module))
     }
@@ -147,7 +145,7 @@ pub fn get_target_triple() -> String {
     target_triple
 }
 
-pub fn get_data_layout_rep() -> Result<String, String> {
+pub fn get_data_layout_rep() -> Result<String, CodegenError> {
     unsafe {
         let mut null = null_mut();
         let error_buffer = addr_of_mut!(null);
@@ -163,7 +161,7 @@ pub fn get_data_layout_rep() -> Result<String, String> {
             let err = error.to_string_lossy().to_string();
             dbg!(err.clone());
             LLVMDisposeMessage(*error_buffer);
-            Err(err)?;
+            return Err(CodegenError::LLVMCompileError(err))?;
         }
         if !(*error_buffer).is_null() {
             LLVMDisposeMessage(*error_buffer);
@@ -188,7 +186,7 @@ pub fn get_data_layout_rep() -> Result<String, String> {
     }
 }
 
-fn compile_program(codegen_ctx: CodegenCtx) {
+fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
     let context = codegen_ctx.mlir_context;
     let module = codegen_ctx.mlir_module;
     let operations = codegen_ctx.program;
@@ -211,7 +209,7 @@ fn compile_program(codegen_ctx: CodegenCtx) {
     let main_region = Region::new();
 
     // Setup the stack, memory, etc.
-    let setup_block = generate_stack_setup_block(context);
+    let setup_block = generate_stack_setup_block(context)?;
 
     let mut last_block = setup_block;
 
@@ -219,7 +217,7 @@ fn compile_program(codegen_ctx: CodegenCtx) {
     for op in operations {
         let block = Block::new(&[]);
 
-        generate_code_for_op(codegen_ctx, &block, op).unwrap();
+        generate_code_for_op(codegen_ctx, &block, op)?;
 
         last_block.append_operation(cf::br(&block, &[], location));
         main_region.append_block(last_block);
@@ -232,8 +230,8 @@ fn compile_program(codegen_ctx: CodegenCtx) {
 
     // Setup return operation
     // This returns the last element of the stack
-    let return_value = load_from_stack(context, &return_block);
-    return_block.append_operation(func::r#return(&[return_value.into()], location));
+    let return_value = load_from_stack(context, &return_block)?;
+    return_block.append_operation(func::r#return(&[return_value], location));
 
     // Append the return operation
     main_region.append_block(return_block);
@@ -248,9 +246,10 @@ fn compile_program(codegen_ctx: CodegenCtx) {
     );
 
     module.body().append_operation(main_func);
+    Ok(())
 }
 
-fn generate_stack_setup_block(context: &MeliorContext) -> Block {
+fn generate_stack_setup_block(context: &MeliorContext) -> Result<Block, CodegenError> {
     let block = Block::new(&[]);
     let uint256 = IntegerType::new(context, 256);
     let location = Location::unknown(context);
@@ -261,8 +260,7 @@ fn generate_stack_setup_block(context: &MeliorContext) -> Block {
             IntegerAttribute::new(uint256.into(), MAX_STACK_ELEMENTS).into(),
             location,
         ))
-        .result(0)
-        .unwrap()
+        .result(0)?
         .into();
 
     let stack_baseptr = block
@@ -273,8 +271,7 @@ fn generate_stack_setup_block(context: &MeliorContext) -> Block {
             location,
             AllocaOptions::new().elem_type(Some(TypeAttribute::new(uint256.into()))),
         ))
-        .result(0)
-        .unwrap();
+        .result(0)?;
 
     let stack_baseptr_ptr = block
         .append_operation(llvm_mlir::addressof(
@@ -283,8 +280,7 @@ fn generate_stack_setup_block(context: &MeliorContext) -> Block {
             ptr_type,
             location,
         ))
-        .result(0)
-        .unwrap();
+        .result(0)?;
 
     let res = block.append_operation(llvm::store(
         context,
@@ -295,5 +291,5 @@ fn generate_stack_setup_block(context: &MeliorContext) -> Block {
     ));
 
     assert!(res.verify());
-    block
+    Ok(block)
 }

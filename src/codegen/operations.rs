@@ -6,13 +6,13 @@ use melior::{
 use num_bigint::BigUint;
 
 use super::context::CodegenCtx;
-use crate::{opcodes::Operation, utils::store_in_stack};
+use crate::{errors::CodegenError, opcodes::Operation, utils::store_in_stack};
 
 pub fn generate_code_for_op(
     context: CodegenCtx,
     block: &Block,
     op: &Operation,
-) -> Result<(), String> {
+) -> Result<(), CodegenError> {
     match op {
         Operation::Push32(x) => codegen_push(context, block, *x),
         _ => todo!(),
@@ -24,7 +24,7 @@ fn codegen_push(
     codegen_ctx: CodegenCtx,
     block: &Block,
     value_to_push: [u8; 32],
-) -> Result<(), String> {
+) -> Result<(), CodegenError> {
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
 
@@ -34,16 +34,16 @@ fn codegen_push(
             integer_constant(context, value_to_push),
             location,
         ))
-        .result(0)
-        .unwrap()
+        .result(0)?
         .into();
 
-    store_in_stack(context, block, constant_value);
+    store_in_stack(context, block, constant_value)?;
 
     Ok(())
 }
 
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
     let str_value = BigUint::from_bytes_be(&value).to_string();
+    // TODO: should we handle this error?
     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
 }

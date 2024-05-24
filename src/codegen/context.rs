@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use melior::{ir::Module as MeliorModule, Context as MeliorContext};
 
 use crate::opcodes::Operation;
