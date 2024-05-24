@@ -7,7 +7,7 @@ fn main() {
     let program = Operation::from_bytecode(bytecode);
     let output_file = "output";
 
-    compile_binary(program, output_file);
+    compile_binary(program, output_file).unwrap();
     println!("Done!");
     println!("Program was compiled in {output_file}");
 }
