@@ -45,11 +45,11 @@ use std::{
 
 use crate::{
     codegen::{context::CodegenCtx, operations::generate_code_for_op, run_pass_manager},
+    constants::{MAX_STACK_ELEMENTS, STACK_GLOBAL_VAR},
     module::MLIRModule,
     opcodes::Operation,
+    utils::{llvm_mlir, load_from_stack},
 };
-
-const MAX_STACK_ELEMENTS: i64 = 1024;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Context {
@@ -358,26 +358,12 @@ fn compile_program(codegen_ctx: CodegenCtx) {
     let uint256 = IntegerType::new(context, 256);
 
     let body = module.body();
-    let res = body.append_operation(
-        OperationBuilder::new("llvm.mlir.global", location)
-            .add_regions([Region::new()])
-            .add_attributes(&[
-                (
-                    Identifier::new(context, "sym_name"),
-                    StringAttribute::new(context, "stack_ptr").into(),
-                ),
-                (
-                    Identifier::new(context, "global_type"),
-                    TypeAttribute::new(ptr_type).into(),
-                ),
-                (
-                    Identifier::new(context, "linkage"),
-                    llvm::attributes::linkage(context, Linkage::Internal),
-                ),
-            ])
-            .build()
-            .unwrap(),
-    );
+    let res = body.append_operation(llvm_mlir::global(
+        context,
+        STACK_GLOBAL_VAR,
+        ptr_type,
+        location,
+    ));
     assert!(res.verify());
 
     // Build a region for the main function
@@ -408,16 +394,12 @@ fn compile_program(codegen_ctx: CodegenCtx) {
         .unwrap();
 
     let stack_baseptr_ptr = setup_block
-        .append_operation(
-            OperationBuilder::new("llvm.mlir.addressof", location)
-                .add_attributes(&[(
-                    Identifier::new(context, "global_name"),
-                    FlatSymbolRefAttribute::new(context, "stack_ptr").into(),
-                )])
-                .add_results(&[ptr_type])
-                .build()
-                .unwrap(),
-        )
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_GLOBAL_VAR,
+            ptr_type,
+            location,
+        ))
         .result(0)
         .unwrap();
 
@@ -445,41 +427,7 @@ fn compile_program(codegen_ctx: CodegenCtx) {
 
     // Setup return operation
     // This returns the last element of the stack
-    let stack_baseptr_ptr = return_block
-        .append_operation(
-            OperationBuilder::new("llvm.mlir.addressof", location)
-                .add_attributes(&[(
-                    Identifier::new(context, "global_name"),
-                    FlatSymbolRefAttribute::new(context, "stack_ptr").into(),
-                )])
-                .add_results(&[ptr_type])
-                .build()
-                .unwrap(),
-        )
-        .result(0)
-        .unwrap();
-
-    let stack_baseptr = return_block
-        .append_operation(llvm::load(
-            context,
-            stack_baseptr_ptr.into(),
-            ptr_type,
-            location,
-            LoadStoreOptions::default(),
-        ))
-        .result(0)
-        .unwrap();
-
-    let return_value = return_block
-        .append_operation(llvm::load(
-            context,
-            stack_baseptr.into(),
-            uint256.into(),
-            location,
-            LoadStoreOptions::default(),
-        ))
-        .result(0)
-        .unwrap();
+    let return_value = load_from_stack(context, &return_block);
     return_block.append_operation(func::r#return(&[return_value.into()], location));
 
     // Append the return operation
