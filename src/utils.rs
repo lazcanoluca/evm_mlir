@@ -47,6 +47,41 @@ pub fn load_from_stack<'ctx>(
         .into()
 }
 
+pub fn store_in_stack<'ctx>(context: &'ctx MeliorContext, block: &'ctx Block, value: Value) {
+    let location = Location::unknown(context);
+    let ptr_type = pointer(context, 0);
+    let stack_baseptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_GLOBAL_VAR,
+            ptr_type,
+            location,
+        ))
+        .result(0)
+        .unwrap();
+
+    let stack_baseptr = block
+        .append_operation(llvm::load(
+            context,
+            stack_baseptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)
+        .unwrap();
+
+    let res = block.append_operation(llvm::store(
+        context,
+        value,
+        stack_baseptr.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+
+    assert!(res.verify());
+}
+
 pub mod llvm_mlir {
     use melior::{
         dialect::llvm::{self, attributes::Linkage},
