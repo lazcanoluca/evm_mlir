@@ -1,16 +1,13 @@
-use evm_mlir::{compile, compile_to_object, context::Context, link_binary, opcodes::Operation};
+use evm_mlir::{compile_binary, opcodes::Operation};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = args.get(1).expect("No path provided").as_str();
     let bytecode = std::fs::read(path).expect("Could not read file");
-    let operations = Operation::from_bytecode(bytecode);
+    let program = Operation::from_bytecode(bytecode);
+    let output_file = "output";
 
-    let object_file = compile(operations);
-
-    println!("Linking...");
-
-    link_binary(object_file);
-
+    compile_binary(program, output_file);
     println!("Done!");
+    println!("Program was compiled in {output_file}");
 }

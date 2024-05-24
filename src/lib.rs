@@ -1,7 +1,7 @@
 use std::{
     ffi::{CStr, CString},
     mem::MaybeUninit,
-    path::PathBuf,
+    path::{Path, PathBuf},
     ptr::{addr_of_mut, null_mut},
     sync::OnceLock,
 };
@@ -192,17 +192,22 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
 }
 
 /// Links object file to produce an executable binary
-pub fn link_binary(object_file: PathBuf) {
+pub fn link_binary(object_file: impl AsRef<Path>, output_file: impl AsRef<Path>) {
     let args = vec![
         "-L/usr/local/lib",
         "-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib",
-        object_file.to_str().unwrap(),
+        object_file.as_ref().to_str().unwrap(),
         "-o",
-        "output",
+        output_file.as_ref().to_str().unwrap(),
         "-lSystem",
     ];
     let mut linker = std::process::Command::new("ld");
     let proc = linker.args(args).spawn().unwrap();
     let output = proc.wait_with_output().unwrap();
     assert!(output.status.success());
+}
+
+pub fn compile_binary(program: Vec<Operation>, output_file: impl AsRef<Path>) {
+    let object_file = compile(program);
+    link_binary(object_file, &output_file);
 }
