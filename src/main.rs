@@ -1,9 +1,8 @@
-use evm_mlir::codegen::context::{self, compile_to_object};
+use evm_mlir::{
+    context::{compile_to_object, Context},
+    opcodes::Operation,
+};
 use std::path::PathBuf;
-
-use evm_mlir::opcodes::Operation;
-
-mod opcodes;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -11,7 +10,7 @@ fn main() {
     let bytecode = std::fs::read(path).expect("Could not read file");
     let operations = Operation::from_bytecode(bytecode);
 
-    let context = context::Context::new();
+    let context = Context::new();
 
     println!("Creating MLIR module");
 

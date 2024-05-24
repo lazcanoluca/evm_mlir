@@ -1,4 +1,4 @@
 pub mod context;
-pub mod module;
+pub(crate) mod operations;
 mod pass_manager;
 pub use pass_manager::run_pass_manager;

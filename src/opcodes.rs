@@ -1,5 +1,4 @@
-#![allow(dead_code)]
-
+#[derive(Debug)]
 pub enum Opcode {
     STOP = 0x00,
     ADD = 0x01,
@@ -20,6 +19,7 @@ impl From<u8> for Opcode {
     }
 }
 
+#[derive(Debug)]
 pub enum Operation {
     Stop,
     Add,

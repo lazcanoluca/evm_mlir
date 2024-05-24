@@ -1,5 +1,6 @@
-use melior::{ir::Module as MeliorModule, Context};
 use std::fmt::Debug;
+
+use melior::{ir::Module as MeliorModule, Context as MeliorContext};
 
 pub struct MLIRModule<'m> {
     pub(crate) melior_module: MeliorModule<'m>,
@@ -16,7 +17,7 @@ impl<'m> MLIRModule<'m> {
         &self.melior_module
     }
 
-    pub fn parse(context: &Context, source: &str) -> Option<Self> {
+    pub fn parse(context: &MeliorContext, source: &str) -> Option<Self> {
         MeliorModule::parse(context, source).map(Self::new)
     }
 }

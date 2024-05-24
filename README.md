@@ -6,5 +6,5 @@ An EVM bytecode compiler written with MLIR.
 
 ```bash
 source scripts/env-macos.sh
-cargo run <path to bytecode file>
+cargo run programs/push32.bytecode
 ```
