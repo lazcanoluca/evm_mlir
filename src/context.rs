@@ -22,11 +22,11 @@ use llvm_sys::{
 use melior::{
     dialect::{
         arith, cf, func,
-        llvm::{self, attributes::Linkage, r#type::pointer, AllocaOptions, LoadStoreOptions},
+        llvm::{self, r#type::pointer, AllocaOptions, LoadStoreOptions},
         DialectRegistry,
     },
     ir::{
-        attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
+        attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
         operation::OperationBuilder,
         r#type::{FunctionType, IntegerType},
         Block, Identifier, Location, Module as MeliorModule, Region,
@@ -370,60 +370,24 @@ fn compile_program(codegen_ctx: CodegenCtx) {
     let main_region = Region::new();
 
     // Setup the stack, memory, etc.
-    let setup_block = Block::new(&[]);
+    let setup_block = generate_stack_setup_block(context);
 
-    let stack_size = setup_block
-        .append_operation(arith::constant(
-            context,
-            IntegerAttribute::new(uint256.into(), MAX_STACK_ELEMENTS).into(),
-            location,
-        ))
-        .result(0)
-        .unwrap()
-        .into();
-
-    let stack_baseptr = setup_block
-        .append_operation(llvm::alloca(
-            context,
-            stack_size,
-            ptr_type,
-            location,
-            AllocaOptions::new().elem_type(Some(TypeAttribute::new(uint256.into()))),
-        ))
-        .result(0)
-        .unwrap();
-
-    let stack_baseptr_ptr = setup_block
-        .append_operation(llvm_mlir::addressof(
-            context,
-            STACK_GLOBAL_VAR,
-            ptr_type,
-            location,
-        ))
-        .result(0)
-        .unwrap();
-
-    let res = setup_block.append_operation(llvm::store(
-        context,
-        stack_baseptr.into(),
-        stack_baseptr_ptr.into(),
-        location,
-        LoadStoreOptions::default(),
-    ));
-
-    assert!(res.verify());
+    let mut last_block = setup_block;
 
     // Generate code for the program
     for op in operations {
-        // TODO: split operations into blocks
-        generate_code_for_op(codegen_ctx, &setup_block, stack_baseptr.into(), op).unwrap();
+        let block = Block::new(&[]);
+
+        generate_code_for_op(codegen_ctx, &block, op).unwrap();
+
+        last_block.append_operation(cf::br(&block, &[], location));
+        main_region.append_block(last_block);
+        last_block = block;
     }
 
     let return_block = Block::new(&[]);
-
-    setup_block.append_operation(cf::br(&return_block, &[], location));
-
-    main_region.append_block(setup_block);
+    last_block.append_operation(cf::br(&return_block, &[], location));
+    main_region.append_block(last_block);
 
     // Setup return operation
     // This returns the last element of the stack
@@ -443,4 +407,52 @@ fn compile_program(codegen_ctx: CodegenCtx) {
     );
 
     module.body().append_operation(main_func);
+}
+
+fn generate_stack_setup_block(context: &MeliorContext) -> Block {
+    let block = Block::new(&[]);
+    let uint256 = IntegerType::new(context, 256);
+    let location = Location::unknown(context);
+    let ptr_type = pointer(context, 0);
+    let stack_size = block
+        .append_operation(arith::constant(
+            context,
+            IntegerAttribute::new(uint256.into(), MAX_STACK_ELEMENTS).into(),
+            location,
+        ))
+        .result(0)
+        .unwrap()
+        .into();
+
+    let stack_baseptr = block
+        .append_operation(llvm::alloca(
+            context,
+            stack_size,
+            ptr_type,
+            location,
+            AllocaOptions::new().elem_type(Some(TypeAttribute::new(uint256.into()))),
+        ))
+        .result(0)
+        .unwrap();
+
+    let stack_baseptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_GLOBAL_VAR,
+            ptr_type,
+            location,
+        ))
+        .result(0)
+        .unwrap();
+
+    let res = block.append_operation(llvm::store(
+        context,
+        stack_baseptr.into(),
+        stack_baseptr_ptr.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+
+    assert!(res.verify());
+    block
 }
