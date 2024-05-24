@@ -1,7 +1,7 @@
 use evm_mlir::codegen::context::{self, compile_to_object};
 use std::path::PathBuf;
 
-use crate::opcodes::Operation;
+use evm_mlir::opcodes::Operation;
 
 mod opcodes;
 

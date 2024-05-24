@@ -1,6 +1,5 @@
 #[allow(dead_code)]
 use std::{
-    alloc::Layout,
     ffi::{CStr, CString},
     mem::MaybeUninit,
     path::PathBuf,
@@ -9,7 +8,10 @@ use std::{
 };
 
 use llvm_sys::{
-    core::{LLVMContextCreate, LLVMContextDispose, LLVMDisposeMessage, LLVMDisposeModule},
+    core::{
+        LLVMContextCreate, LLVMContextDispose, LLVMDisposeMessage, LLVMDisposeModule,
+        LLVMPrintModuleToFile,
+    },
     error::LLVMGetErrorMessage,
     target::{
         LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs,
@@ -35,9 +37,9 @@ use melior::{
         attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
         operation::OperationBuilder,
         r#type::{FunctionType, IntegerType},
-        Block, Identifier, Location, Region,
+        Block, Identifier, Location, Module as MeliorModule, Region,
     },
-    utility::{register_all_dialects, register_all_llvm_translations},
+    utility::{register_all_dialects, register_all_llvm_translations, register_all_passes},
     Context as MeliorContext,
 };
 use mlir_sys::mlirTranslateModuleToLLVMIR;
@@ -146,7 +148,7 @@ pub fn initialize_mlir() -> MeliorContext {
         registry
     });
     context.load_all_available_dialects();
-    // register_all_passes();
+    register_all_passes();
     register_all_llvm_translations(&context);
     context
 }
@@ -188,18 +190,7 @@ pub fn get_data_layout_rep() -> Result<String, String> {
             target_triple.cast(),
             target_cpu.cast(),
             target_cpu_features.cast(),
-            // match session.optlevel {
-            //     OptLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-            //     OptLevel::Less => LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
-            //     OptLevel::Default => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
-            //     OptLevel::Aggressive => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
-            // },
             LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-            // if session.library {
-            //     LLVMRelocMode::LLVMRelocDynamicNoPic
-            // } else {
-            //     LLVMRelocMode::LLVMRelocDefault
-            // },
             LLVMRelocMode::LLVMRelocDefault,
             LLVMCodeModel::LLVMCodeModelDefault,
         );
@@ -216,17 +207,14 @@ pub fn get_data_layout_rep() -> Result<String, String> {
 /// TODO: error handling
 ///
 /// Returns the path to the object.
-pub fn compile_to_object(
-    // session: &Session,
-    module: &MLIRModule<'_>,
-) -> Result<PathBuf, String> {
+// TODO: pass options to the function
+pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
     // TODO: put a proper target_file here
     let target_file = PathBuf::from("output.o");
     // let target_file = session.output_file.with_extension("o");
 
     // TODO: Rework so you can specify target and host features, etc.
     // Right now it compiles for the native cpu feature set and arch
-
     unsafe {
         let llvm_context = LLVMContextCreate();
 
@@ -262,29 +250,12 @@ pub fn compile_to_object(
             target_triple.cast(),
             target_cpu.cast(),
             target_cpu_features.cast(),
-            // match session.optlevel {
-            //     OptLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-            //     OptLevel::Less => LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
-            //     OptLevel::Default => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
-            //     OptLevel::Aggressive => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
-            // },
             LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-            // if session.library {
-            //     LLVMRelocMode::LLVMRelocDynamicNoPic
-            // } else {
-            //     LLVMRelocMode::LLVMRelocDefault
-            // },
             LLVMRelocMode::LLVMRelocDefault,
             LLVMCodeModel::LLVMCodeModelDefault,
         );
 
         let opts = LLVMCreatePassBuilderOptions();
-        // let opt = match session.optlevel {
-        //     OptLevel::None => 0,
-        //     OptLevel::Less => 1,
-        //     OptLevel::Default => 2,
-        //     OptLevel::Aggressive => 3,
-        // };
         let opt = 0;
         let passes = CString::new(format!("default<O{opt}>")).unwrap();
         let error = LLVMRunPasses(llvm_module as *mut _, passes.as_ptr(), machine, opts);
@@ -296,29 +267,27 @@ pub fn compile_to_object(
 
         LLVMDisposePassBuilderOptions(opts);
 
-        // if session.output_ll {
-        //     let filename = CString::new(
-        //         target_file
-        //             .with_extension("ll")
-        //             .as_os_str()
-        //             .to_string_lossy()
-        //             .as_bytes(),
-        //     )
-        //     .unwrap();
-        //     if LLVMPrintModuleToFile(llvm_module, filename.as_ptr(), error_buffer) != 0 {
-        //         let error = CStr::from_ptr(*error_buffer);
-        //         let err = error.to_string_lossy().to_string();
-        //         tracing::error!("error outputing ll file: {}", err);
-        //         LLVMDisposeMessage(*error_buffer);
-        //         Err(CodegenError::LLVMCompileError(err))?;
-        //     } else if !(*error_buffer).is_null() {
-        //         LLVMDisposeMessage(*error_buffer);
-        //         error_buffer = addr_of_mut!(null);
-        //     }
-        // }
+        // Output the LLVM IR
+        let filename = CString::new(
+            target_file
+                .with_extension("ll")
+                .as_os_str()
+                .to_string_lossy()
+                .as_bytes(),
+        )
+        .unwrap();
+        if LLVMPrintModuleToFile(llvm_module, filename.as_ptr(), error_buffer) != 0 {
+            let error = CStr::from_ptr(*error_buffer);
+            let err = error.to_string_lossy().to_string();
+            LLVMDisposeMessage(*error_buffer);
+            Err(err)?;
+        } else if !(*error_buffer).is_null() {
+            LLVMDisposeMessage(*error_buffer);
+            error_buffer = addr_of_mut!(null);
+        }
 
+        // Output the object file
         let filename = CString::new(target_file.as_os_str().to_string_lossy().as_bytes()).unwrap();
-        // tracing::debug!("filename to llvm: {:?}", filename);
         let ok = LLVMTargetMachineEmitToFile(
             machine,
             llvm_module,
@@ -330,13 +299,13 @@ pub fn compile_to_object(
         if ok != 0 {
             let error = CStr::from_ptr(*error_buffer);
             let err = error.to_string_lossy().to_string();
-            // tracing::error!("error emitting to file: {:?}", err);
             LLVMDisposeMessage(*error_buffer);
             Err(err)?;
         } else if !(*error_buffer).is_null() {
             LLVMDisposeMessage(*error_buffer);
         }
 
+        // Output the assembly
         let filename = CString::new(
             target_file
                 .with_extension("asm")
@@ -349,7 +318,7 @@ pub fn compile_to_object(
             machine,
             llvm_module,
             filename.as_ptr().cast_mut(),
-            LLVMCodeGenFileType::LLVMAssemblyFile, // object (binary) or assembly (textual)
+            LLVMCodeGenFileType::LLVMAssemblyFile,
             error_buffer,
         );
 
