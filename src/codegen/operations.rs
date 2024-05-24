@@ -55,6 +55,6 @@ fn codegen_push(
 }
 
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
-    let str_value = BigUint::from_bytes_le(&value).to_string();
+    let str_value = BigUint::from_bytes_be(&value).to_string();
     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
 }

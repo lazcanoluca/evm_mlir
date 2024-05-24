@@ -22,11 +22,11 @@ use llvm_sys::{
 use melior::{
     dialect::{
         arith, cf, func,
-        llvm::{self, r#type::pointer, AllocaOptions},
+        llvm::{self, attributes::Linkage, r#type::pointer, AllocaOptions, LoadStoreOptions},
         DialectRegistry,
     },
     ir::{
-        attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
+        attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
         operation::OperationBuilder,
         r#type::{FunctionType, IntegerType},
         Block, Identifier, Location, Module as MeliorModule, Region,
@@ -48,6 +48,8 @@ use crate::{
     module::MLIRModule,
     opcodes::Operation,
 };
+
+const MAX_STACK_ELEMENTS: i64 = 1024;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Context {
@@ -115,8 +117,7 @@ impl Context {
             program: &program,
         };
 
-        let main_func = compile_program(codegen_ctx);
-        melior_module.body().append_operation(main_func);
+        compile_program(codegen_ctx);
 
         assert!(melior_module.as_operation().verify());
 
@@ -346,12 +347,38 @@ pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, String> {
     }
 }
 
-fn compile_program(codegen_ctx: CodegenCtx) -> melior::ir::Operation {
+fn compile_program(codegen_ctx: CodegenCtx) {
     let context = codegen_ctx.mlir_context;
+    let module = codegen_ctx.mlir_module;
     let operations = codegen_ctx.program;
+
     let location = Location::unknown(context);
 
+    let ptr_type = pointer(context, 0);
     let uint256 = IntegerType::new(context, 256);
+
+    let body = module.body();
+    let res = body.append_operation(
+        OperationBuilder::new("llvm.mlir.global", location)
+            .add_regions([Region::new()])
+            .add_attributes(&[
+                (
+                    Identifier::new(context, "sym_name"),
+                    StringAttribute::new(context, "stack_ptr").into(),
+                ),
+                (
+                    Identifier::new(context, "global_type"),
+                    TypeAttribute::new(ptr_type).into(),
+                ),
+                (
+                    Identifier::new(context, "linkage"),
+                    llvm::attributes::linkage(context, Linkage::Internal),
+                ),
+            ])
+            .build()
+            .unwrap(),
+    );
+    assert!(res.verify());
 
     // Build a region for the main function
     let main_region = Region::new();
@@ -359,31 +386,55 @@ fn compile_program(codegen_ctx: CodegenCtx) -> melior::ir::Operation {
     // Setup the stack, memory, etc.
     let setup_block = Block::new(&[]);
 
-    let constant_1024 = setup_block
+    let stack_size = setup_block
         .append_operation(arith::constant(
             context,
-            IntegerAttribute::new(uint256.into(), 1024).into(),
+            IntegerAttribute::new(uint256.into(), MAX_STACK_ELEMENTS).into(),
             location,
-        ))
-        .result(0)
-        .unwrap()
-        .into();
-    let stack_baseptr = setup_block
-        .append_operation(llvm::alloca(
-            context,
-            constant_1024,
-            pointer(context, 0),
-            location,
-            AllocaOptions::new().elem_type(Some(TypeAttribute::new(uint256.into()))),
         ))
         .result(0)
         .unwrap()
         .into();
 
+    let stack_baseptr = setup_block
+        .append_operation(llvm::alloca(
+            context,
+            stack_size,
+            ptr_type,
+            location,
+            AllocaOptions::new().elem_type(Some(TypeAttribute::new(uint256.into()))),
+        ))
+        .result(0)
+        .unwrap();
+
+    let stack_baseptr_ptr = setup_block
+        .append_operation(
+            OperationBuilder::new("llvm.mlir.addressof", location)
+                .add_attributes(&[(
+                    Identifier::new(context, "global_name"),
+                    FlatSymbolRefAttribute::new(context, "stack_ptr").into(),
+                )])
+                .add_results(&[ptr_type])
+                .build()
+                .unwrap(),
+        )
+        .result(0)
+        .unwrap();
+
+    let res = setup_block.append_operation(llvm::store(
+        context,
+        stack_baseptr.into(),
+        stack_baseptr_ptr.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+
+    assert!(res.verify());
+
     // Generate code for the program
     for op in operations {
         // TODO: split operations into blocks
-        generate_code_for_op(codegen_ctx, &setup_block, stack_baseptr, op).unwrap();
+        generate_code_for_op(codegen_ctx, &setup_block, stack_baseptr.into(), op).unwrap();
     }
 
     let return_block = Block::new(&[]);
@@ -393,26 +444,55 @@ fn compile_program(codegen_ctx: CodegenCtx) -> melior::ir::Operation {
     main_region.append_block(setup_block);
 
     // Setup return operation
-    let return_value = return_block
-        .append_operation(arith::constant(
+    // This returns the last element of the stack
+    let stack_baseptr_ptr = return_block
+        .append_operation(
+            OperationBuilder::new("llvm.mlir.addressof", location)
+                .add_attributes(&[(
+                    Identifier::new(context, "global_name"),
+                    FlatSymbolRefAttribute::new(context, "stack_ptr").into(),
+                )])
+                .add_results(&[ptr_type])
+                .build()
+                .unwrap(),
+        )
+        .result(0)
+        .unwrap();
+
+    let stack_baseptr = return_block
+        .append_operation(llvm::load(
             context,
-            IntegerAttribute::new(uint256.into(), 42).into(),
+            stack_baseptr_ptr.into(),
+            ptr_type,
             location,
+            LoadStoreOptions::default(),
         ))
         .result(0)
-        .unwrap()
-        .into();
-    return_block.append_operation(func::r#return(&[return_value], location));
+        .unwrap();
+
+    let return_value = return_block
+        .append_operation(llvm::load(
+            context,
+            stack_baseptr.into(),
+            uint256.into(),
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)
+        .unwrap();
+    return_block.append_operation(func::r#return(&[return_value.into()], location));
 
     // Append the return operation
     main_region.append_block(return_block);
 
-    func::func(
+    let main_func = func::func(
         context,
         StringAttribute::new(context, "main"),
         TypeAttribute::new(FunctionType::new(context, &[], &[uint256.into()]).into()),
         main_region,
         &[],
         location,
-    )
+    );
+
+    module.body().append_operation(main_func);
 }
