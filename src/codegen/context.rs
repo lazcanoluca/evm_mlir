@@ -13,5 +13,5 @@ pub(crate) struct CodegenCtx<'a> {
     /// The compile session info.
     // pub session: &'a Session,
     /// The program IR.
-    pub program: &'a Vec<Operation>,
+    pub program: &'a [Operation],
 }
