@@ -242,7 +242,7 @@ pub fn link_binary(
             };
 
             let mut args = vec![
-                "-pie",
+                // "-pie",
                 "--hash-style=gnu",
                 "--eh-frame-hdr",
                 "--dynamic-linker",
