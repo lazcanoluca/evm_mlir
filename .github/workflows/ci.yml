@@ -110,5 +110,5 @@ jobs:
         with:
           tool: cargo-nextest
 
-      - name: Run tests with no std
+      - name: Run tests
         run: cargo nextest run --workspace --all-features

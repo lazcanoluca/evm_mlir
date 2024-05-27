@@ -225,32 +225,32 @@ pub fn link_binary(
         }
         #[cfg(target_os = "linux")]
         {
-            let (scrt1, crti, crtn) = {
-                if Path::new("/usr/lib64/Scrt1.o").exists() {
-                    (
-                        "/usr/lib64/Scrt1.o",
-                        "/usr/lib64/crti.o",
-                        "/usr/lib64/crtn.o",
-                    )
-                } else {
-                    (
-                        "/lib/x86_64-linux-gnu/Scrt1.o",
-                        "/lib/x86_64-linux-gnu/crti.o",
-                        "/lib/x86_64-linux-gnu/crtn.o",
-                    )
-                }
-            };
+            // let (scrt1, crti, crtn) = {
+            //     if Path::new("/usr/lib64/Scrt1.o").exists() {
+            //         (
+            //             "/usr/lib64/Scrt1.o",
+            //             "/usr/lib64/crti.o",
+            //             "/usr/lib64/crtn.o",
+            //         )
+            //     } else {
+            //         (
+            //             "/lib/x86_64-linux-gnu/Scrt1.o",
+            //             "/lib/x86_64-linux-gnu/crti.o",
+            //             "/lib/x86_64-linux-gnu/crtn.o",
+            //         )
+            //     }
+            // };
 
             let mut args = vec![
                 // "-pie",
-                "--hash-style=gnu",
-                "--eh-frame-hdr",
-                "--dynamic-linker",
-                "/lib64/ld-linux-x86-64.so.2",
-                "-m",
-                "elf_x86_64",
-                scrt1,
-                crti,
+                // "--hash-style=gnu",
+                // "--eh-frame-hdr",
+                // "--dynamic-linker",
+                // "/lib64/ld-linux-x86-64.so.2",
+                // "-m",
+                // "elf_x86_64",
+                // scrt1,
+                // crti,
             ];
 
             args.extend(&["-o", &output_filename]);
@@ -259,11 +259,11 @@ pub fn link_binary(
                 "-L/lib64",
                 "-L/usr/lib64",
                 "-L/lib/x86_64-linux-gnu",
-                "-zrelro",
-                "--no-as-needed",
+                // "-zrelro",
+                // "--no-as-needed",
                 "-lc",
                 "-O1",
-                crtn,
+                // crtn,
             ]);
 
             args.extend(objects.iter().map(|x| x.as_str()));
