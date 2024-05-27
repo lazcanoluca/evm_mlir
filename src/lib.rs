@@ -226,7 +226,7 @@ pub fn link_binary(
         #[cfg(target_os = "linux")]
         {
             let (scrt1, crti, crtn) = {
-                if file_exists("/usr/lib64/Scrt1.o") {
+                if Path::new("/usr/lib64/Scrt1.o").exists() {
                     (
                         "/usr/lib64/Scrt1.o",
                         "/usr/lib64/crti.o",
