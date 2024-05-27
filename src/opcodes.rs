@@ -19,7 +19,7 @@ impl From<u8> for Opcode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Operation {
     Stop,
     Add,

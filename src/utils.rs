@@ -4,9 +4,9 @@ use melior::{
     Context as MeliorContext,
 };
 
-use crate::{constants::STACK_GLOBAL_VAR, errors::CodegenError};
+use crate::{constants::STACK_PTR_GLOBAL, errors::CodegenError};
 
-pub fn load_from_stack<'ctx>(
+pub fn stack_pop<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
 ) -> Result<Value<'ctx, 'ctx>, CodegenError> {
@@ -16,7 +16,7 @@ pub fn load_from_stack<'ctx>(
     let stack_baseptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
-            STACK_GLOBAL_VAR,
+            STACK_PTR_GLOBAL,
             ptr_type,
             location,
         ))
@@ -42,10 +42,12 @@ pub fn load_from_stack<'ctx>(
         ))
         .result(0)?
         .into();
+
+    // TODO: pop value from stack
     Ok(value)
 }
 
-pub fn store_in_stack<'ctx>(
+pub fn stack_push<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
     value: Value,
@@ -55,7 +57,7 @@ pub fn store_in_stack<'ctx>(
     let stack_baseptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
-            STACK_GLOBAL_VAR,
+            STACK_PTR_GLOBAL,
             ptr_type,
             location,
         ))
@@ -80,6 +82,8 @@ pub fn store_in_stack<'ctx>(
     ));
 
     assert!(res.verify());
+
+    // TODO: push value to stack
     Ok(())
 }
 

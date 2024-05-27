@@ -30,11 +30,11 @@ use std::{
 
 use crate::{
     codegen::{context::CodegenCtx, operations::generate_code_for_op, run_pass_manager},
-    constants::{MAX_STACK_ELEMENTS, STACK_GLOBAL_VAR},
+    constants::{MAX_STACK_ELEMENTS, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
     errors::CodegenError,
     module::MLIRModule,
     opcodes::Operation,
-    utils::{llvm_mlir, load_from_stack},
+    utils::{llvm_mlir, stack_pop},
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -192,32 +192,19 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
     let operations = codegen_ctx.program;
 
     let location = Location::unknown(context);
-
-    let ptr_type = pointer(context, 0);
     let uint256 = IntegerType::new(context, 256);
-
-    let body = module.body();
-    let res = body.append_operation(llvm_mlir::global(
-        context,
-        STACK_GLOBAL_VAR,
-        ptr_type,
-        location,
-    ));
-    assert!(res.verify());
 
     // Build a region for the main function
     let main_region = Region::new();
 
     // Setup the stack, memory, etc.
-    let setup_block = generate_stack_setup_block(context)?;
+    let setup_block = generate_stack_setup_block(context, module)?;
 
     let mut last_block = setup_block;
 
     // Generate code for the program
     for op in operations {
-        let block = Block::new(&[]);
-
-        generate_code_for_op(codegen_ctx, &block, op)?;
+        let block = generate_code_for_op(codegen_ctx, &main_region, op.clone())?;
 
         last_block.append_operation(cf::br(&block, &[], location));
         main_region.append_block(last_block);
@@ -230,7 +217,7 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
 
     // Setup return operation
     // This returns the last element of the stack
-    let return_value = load_from_stack(context, &return_block)?;
+    let return_value = stack_pop(context, &return_block)?;
     return_block.append_operation(func::r#return(&[return_value], location));
 
     // Append the return operation
@@ -249,11 +236,34 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
     Ok(())
 }
 
-fn generate_stack_setup_block(context: &MeliorContext) -> Result<Block, CodegenError> {
-    let block = Block::new(&[]);
-    let uint256 = IntegerType::new(context, 256);
+fn generate_stack_setup_block<'c>(
+    context: &'c MeliorContext,
+    module: &'c MeliorModule,
+) -> Result<Block<'c>, CodegenError> {
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
+
+    // Declare the stack pointer and base pointer globals
+    let body = module.body();
+    let res = body.append_operation(llvm_mlir::global(
+        context,
+        STACK_BASEPTR_GLOBAL,
+        ptr_type,
+        location,
+    ));
+    assert!(res.verify());
+    let res = body.append_operation(llvm_mlir::global(
+        context,
+        STACK_PTR_GLOBAL,
+        ptr_type,
+        location,
+    ));
+    assert!(res.verify());
+
+    let block = Block::new(&[]);
+    let uint256 = IntegerType::new(context, 256);
+
+    // Allocate stack memory
     let stack_size = block
         .append_operation(arith::constant(
             context,
@@ -273,10 +283,11 @@ fn generate_stack_setup_block(context: &MeliorContext) -> Result<Block, CodegenE
         ))
         .result(0)?;
 
+    // Populate the globals with the allocated stack memory
     let stack_baseptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
-            STACK_GLOBAL_VAR,
+            STACK_BASEPTR_GLOBAL,
             ptr_type,
             location,
         ))
@@ -289,7 +300,25 @@ fn generate_stack_setup_block(context: &MeliorContext) -> Result<Block, CodegenE
         location,
         LoadStoreOptions::default(),
     ));
-
     assert!(res.verify());
+
+    let stackptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_PTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    let res = block.append_operation(llvm::store(
+        context,
+        stack_baseptr.into(),
+        stackptr_ptr.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+    assert!(res.verify());
+
     Ok(block)
 }

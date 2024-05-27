@@ -1,30 +1,34 @@
 use melior::{
     dialect::arith,
-    ir::{Attribute, Block, Location},
+    ir::{Attribute, Block, Location, Region},
     Context as MeliorContext,
 };
 use num_bigint::BigUint;
 
 use super::context::CodegenCtx;
-use crate::{errors::CodegenError, opcodes::Operation, utils::store_in_stack};
+use crate::{errors::CodegenError, opcodes::Operation, utils::stack_push};
 
-pub fn generate_code_for_op(
-    context: CodegenCtx,
-    block: &Block,
-    op: &Operation,
-) -> Result<(), CodegenError> {
+/// Generates blocks for target [`Operation`].
+/// Returns the unterminated last block of the generated code.
+pub fn generate_code_for_op<'c>(
+    context: CodegenCtx<'c>,
+    region: &Region<'c>,
+    op: Operation,
+) -> Result<Block<'c>, CodegenError> {
     match op {
-        Operation::Push32(x) => codegen_push(context, block, *x),
+        Operation::Push32(x) => codegen_push(context, region, x),
         _ => todo!(),
     }
 }
 
 // TODO: use const generics to generalize for pushN
-fn codegen_push(
-    codegen_ctx: CodegenCtx,
-    block: &Block,
+fn codegen_push<'c>(
+    codegen_ctx: CodegenCtx<'c>,
+    _region: &Region<'c>,
     value_to_push: [u8; 32],
-) -> Result<(), CodegenError> {
+) -> Result<Block<'c>, CodegenError> {
+    // TODO: handle stack overflow
+    let block = Block::new(&[]);
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
 
@@ -37,9 +41,9 @@ fn codegen_push(
         .result(0)?
         .into();
 
-    store_in_stack(context, block, constant_value)?;
+    stack_push(context, &block, constant_value)?;
 
-    Ok(())
+    Ok(block)
 }
 
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
