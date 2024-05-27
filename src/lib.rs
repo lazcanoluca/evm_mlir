@@ -198,19 +198,91 @@ pub fn compile_to_object(
 }
 
 /// Links object file to produce an executable binary
-pub fn link_binary(object_file: impl AsRef<Path>, output_file: impl AsRef<Path>) {
-    let args = vec![
-        "-L/usr/local/lib",
-        "-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib",
-        object_file.as_ref().to_str().unwrap(),
-        "-o",
-        output_file.as_ref().to_str().unwrap(),
-        "-lSystem",
-    ];
+// Taken from cairo_native
+pub fn link_binary(
+    objects: &[impl AsRef<Path>],
+    output_filename: impl AsRef<Path>,
+) -> std::io::Result<()> {
+    let objects: Vec<_> = objects
+        .iter()
+        .map(|x| x.as_ref().display().to_string())
+        .collect();
+    let output_filename = output_filename.as_ref().to_string_lossy().to_string();
+
+    let args: Vec<_> = {
+        #[cfg(target_os = "macos")]
+        {
+            let mut args = vec![
+                "-L/usr/local/lib",
+                "-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib",
+            ];
+
+            args.extend(objects.iter().map(|x| x.as_str()));
+
+            args.extend(&["-o", &output_filename, "-lSystem"]);
+
+            args
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let (scrt1, crti, crtn) = {
+                if file_exists("/usr/lib64/Scrt1.o") {
+                    (
+                        "/usr/lib64/Scrt1.o",
+                        "/usr/lib64/crti.o",
+                        "/usr/lib64/crtn.o",
+                    )
+                } else {
+                    (
+                        "/lib/x86_64-linux-gnu/Scrt1.o",
+                        "/lib/x86_64-linux-gnu/crti.o",
+                        "/lib/x86_64-linux-gnu/crtn.o",
+                    )
+                }
+            };
+
+            let mut args = vec![
+                "-pie",
+                "--hash-style=gnu",
+                "--eh-frame-hdr",
+                "--dynamic-linker",
+                "/lib64/ld-linux-x86-64.so.2",
+                "-m",
+                "elf_x86_64",
+                scrt1,
+                crti,
+            ];
+
+            args.extend(&["-o", &output_filename]);
+
+            args.extend(&[
+                "-L/lib64",
+                "-L/usr/lib64",
+                "-L/lib/x86_64-linux-gnu",
+                "-zrelro",
+                "--no-as-needed",
+                "-lc",
+                "-O1",
+                crtn,
+            ]);
+
+            args.extend(objects.iter().map(|x| x.as_str()));
+
+            args
+        }
+        #[cfg(target_os = "windows")]
+        {
+            unimplemented!()
+        }
+    };
+
     let mut linker = std::process::Command::new("ld");
-    let proc = linker.args(args).spawn().unwrap();
-    let output = proc.wait_with_output().unwrap();
+    let proc = linker.args(args.iter()).spawn()?;
+    let output = proc.wait_with_output()?;
+
+    // TODO: propagate
     assert!(output.status.success());
+    Ok(())
 }
 
 pub fn compile_binary(
@@ -218,6 +290,6 @@ pub fn compile_binary(
     output_file: impl AsRef<Path>,
 ) -> Result<(), CodegenError> {
     let object_file = compile(program, &output_file)?;
-    link_binary(object_file, &output_file);
+    link_binary(&[object_file], output_file)?;
     Ok(())
 }

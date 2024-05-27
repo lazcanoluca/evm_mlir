@@ -50,7 +50,7 @@ fn codegen_push<'c, 'r>(
     let exit_code = revert_block
         .append_operation(arith::constant(
             context,
-            IntegerAttribute::new(uint256.into(), 1 as i64).into(),
+            IntegerAttribute::new(uint256.into(), 1_i64).into(),
             location,
         ))
         .result(0)?;
