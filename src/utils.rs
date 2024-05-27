@@ -1,6 +1,6 @@
 use melior::{
     dialect::llvm::{self, r#type::pointer, LoadStoreOptions},
-    ir::{r#type::IntegerType, Block, Location, Value},
+    ir::{attribute::DenseI32ArrayAttribute, r#type::IntegerType, Block, Location, Value},
     Context as MeliorContext,
 };
 
@@ -13,7 +13,8 @@ pub fn stack_pop<'ctx>(
     let uint256 = IntegerType::new(context, 256);
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
-    let stack_baseptr_ptr = block
+
+    let stack_ptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
             STACK_PTR_GLOBAL,
@@ -22,20 +23,31 @@ pub fn stack_pop<'ctx>(
         ))
         .result(0)?;
 
-    let stack_baseptr = block
+    let stack_ptr = block
         .append_operation(llvm::load(
             context,
-            stack_baseptr_ptr.into(),
+            stack_ptr_ptr.into(),
             ptr_type,
             location,
             LoadStoreOptions::default(),
         ))
         .result(0)?;
 
+    let old_stack_ptr = block
+        .append_operation(llvm::get_element_ptr(
+            context,
+            stack_ptr.into(),
+            DenseI32ArrayAttribute::new(context, &[-1]),
+            uint256.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
     let value = block
         .append_operation(llvm::load(
             context,
-            stack_baseptr.into(),
+            old_stack_ptr.into(),
             uint256.into(),
             location,
             LoadStoreOptions::default(),
@@ -43,7 +55,15 @@ pub fn stack_pop<'ctx>(
         .result(0)?
         .into();
 
-    // TODO: pop value from stack
+    let res = block.append_operation(llvm::store(
+        context,
+        old_stack_ptr.into(),
+        stack_ptr.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+    assert!(res.verify());
+
     Ok(value)
 }
 
@@ -54,7 +74,7 @@ pub fn stack_push<'ctx>(
 ) -> Result<(), CodegenError> {
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
-    let stack_baseptr_ptr = block
+    let stack_ptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
             STACK_PTR_GLOBAL,
@@ -63,27 +83,47 @@ pub fn stack_push<'ctx>(
         ))
         .result(0)?;
 
-    let stack_baseptr = block
+    let stack_ptr = block
         .append_operation(llvm::load(
             context,
-            stack_baseptr_ptr.into(),
+            stack_ptr_ptr.into(),
             ptr_type,
             location,
             LoadStoreOptions::default(),
         ))
         .result(0)?;
 
+    let uint256 = IntegerType::new(context, 256);
+
     let res = block.append_operation(llvm::store(
         context,
         value,
-        stack_baseptr.into(),
+        stack_ptr.into(),
         location,
         LoadStoreOptions::default(),
     ));
-
     assert!(res.verify());
 
-    // TODO: push value to stack
+    let new_stack_ptr = block
+        .append_operation(llvm::get_element_ptr(
+            context,
+            stack_ptr.into(),
+            DenseI32ArrayAttribute::new(context, &[1]),
+            uint256.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    let res = block.append_operation(llvm::store(
+        context,
+        new_stack_ptr.into(),
+        stack_ptr_ptr.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+    assert!(res.verify());
+
     Ok(())
 }
 
@@ -104,6 +144,7 @@ pub mod llvm_mlir {
         global_type: melior::ir::Type<'c>,
         location: Location<'c>,
     ) -> melior::ir::Operation<'c> {
+        // TODO: use ODS
         OperationBuilder::new("llvm.mlir.global", location)
             .add_regions([Region::new()])
             .add_attributes(&[
@@ -130,6 +171,7 @@ pub mod llvm_mlir {
         result_type: melior::ir::Type<'c>,
         location: Location<'c>,
     ) -> melior::ir::Operation<'c> {
+        // TODO: use ODS
         OperationBuilder::new("llvm.mlir.addressof", location)
             .add_attributes(&[(
                 Identifier::new(context, "global_name"),
