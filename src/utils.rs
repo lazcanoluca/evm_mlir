@@ -1,10 +1,20 @@
 use melior::{
-    dialect::llvm::{self, r#type::pointer, LoadStoreOptions},
-    ir::{attribute::DenseI32ArrayAttribute, r#type::IntegerType, Block, Location, Value},
+    dialect::{
+        llvm::{self, r#type::pointer, LoadStoreOptions},
+        ods,
+    },
+    ir::{
+        attribute::{DenseI32ArrayAttribute, IntegerAttribute},
+        r#type::IntegerType,
+        Block, Location, Value,
+    },
     Context as MeliorContext,
 };
 
-use crate::{constants::STACK_PTR_GLOBAL, errors::CodegenError};
+use crate::{
+    constants::{MAX_STACK_SIZE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
+    errors::CodegenError,
+};
 
 pub fn stack_pop<'ctx>(
     context: &'ctx MeliorContext,
@@ -14,6 +24,7 @@ pub fn stack_pop<'ctx>(
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
 
+    // Get address of stack pointer global
     let stack_ptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
@@ -23,6 +34,7 @@ pub fn stack_pop<'ctx>(
         ))
         .result(0)?;
 
+    // Load stack pointer
     let stack_ptr = block
         .append_operation(llvm::load(
             context,
@@ -33,6 +45,7 @@ pub fn stack_pop<'ctx>(
         ))
         .result(0)?;
 
+    // Decrement stack pointer
     let old_stack_ptr = block
         .append_operation(llvm::get_element_ptr(
             context,
@@ -44,6 +57,7 @@ pub fn stack_pop<'ctx>(
         ))
         .result(0)?;
 
+    // Load value from top of stack
     let value = block
         .append_operation(llvm::load(
             context,
@@ -55,6 +69,7 @@ pub fn stack_pop<'ctx>(
         .result(0)?
         .into();
 
+    // Store decremented stack pointer
     let res = block.append_operation(llvm::store(
         context,
         old_stack_ptr.into(),
@@ -74,6 +89,8 @@ pub fn stack_push<'ctx>(
 ) -> Result<(), CodegenError> {
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
+
+    // Get address of stack pointer global
     let stack_ptr_ptr = block
         .append_operation(llvm_mlir::addressof(
             context,
@@ -83,6 +100,7 @@ pub fn stack_push<'ctx>(
         ))
         .result(0)?;
 
+    // Load stack pointer
     let stack_ptr = block
         .append_operation(llvm::load(
             context,
@@ -95,6 +113,7 @@ pub fn stack_push<'ctx>(
 
     let uint256 = IntegerType::new(context, 256);
 
+    // Store value at stack pointer
     let res = block.append_operation(llvm::store(
         context,
         value,
@@ -104,6 +123,7 @@ pub fn stack_push<'ctx>(
     ));
     assert!(res.verify());
 
+    // Increment stack pointer
     let new_stack_ptr = block
         .append_operation(llvm::get_element_ptr(
             context,
@@ -115,6 +135,7 @@ pub fn stack_push<'ctx>(
         ))
         .result(0)?;
 
+    // Store incremented stack pointer
     let res = block.append_operation(llvm::store(
         context,
         new_stack_ptr.into(),
@@ -125,6 +146,89 @@ pub fn stack_push<'ctx>(
     assert!(res.verify());
 
     Ok(())
+}
+
+pub fn check_stack_has_space_for<'ctx>(
+    context: &'ctx MeliorContext,
+    block: &'ctx Block,
+    element_count: u32,
+) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+    debug_assert!(element_count < MAX_STACK_SIZE as u32);
+    let location = Location::unknown(context);
+    let ptr_type = pointer(context, 0);
+    let uint256 = IntegerType::new(context, 256);
+
+    // Get address of stack pointer global
+    let stack_ptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_PTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Load stack pointer
+    let stack_ptr = block
+        .append_operation(llvm::load(
+            context,
+            stack_ptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?;
+
+    // Get address of stack base pointer global
+    let stack_baseptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_BASEPTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Load stack base pointer
+    let stack_baseptr = block
+        .append_operation(llvm::load(
+            context,
+            stack_baseptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?;
+
+    // Compare `subtracted_stack_ptr = stack_ptr + element_count - MAX_STACK_SIZE`
+    let subtracted_stack_ptr = block
+        .append_operation(llvm::get_element_ptr(
+            context,
+            stack_ptr.into(),
+            DenseI32ArrayAttribute::new(context, &[element_count as i32 - MAX_STACK_SIZE as i32]),
+            uint256.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Compare `stack_ptr + element_count - MAX_STACK_SIZE <= stack_baseptr`
+    let flag = block
+        .append_operation(
+            ods::llvm::icmp(
+                context,
+                IntegerType::new(context, 1).into(),
+                subtracted_stack_ptr.into(),
+                stack_baseptr.into(),
+                // 7 should be the "ule" predicate enum value
+                IntegerAttribute::new(IntegerType::new(context, 64).into(), 7).into(),
+                location,
+            )
+            .into(),
+        )
+        .result(0)?;
+
+    Ok(flag.into())
 }
 
 pub mod llvm_mlir {

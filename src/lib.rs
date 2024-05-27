@@ -41,7 +41,10 @@ pub mod module;
 pub mod opcodes;
 pub mod utils;
 
-pub fn compile(program: Vec<Operation>) -> Result<PathBuf, CodegenError> {
+pub fn compile(
+    program: Vec<Operation>,
+    output_file: impl AsRef<Path>,
+) -> Result<PathBuf, CodegenError> {
     static INITIALIZED: OnceLock<()> = OnceLock::new();
     INITIALIZED.get_or_init(|| unsafe {
         LLVM_InitializeAllTargets();
@@ -50,8 +53,8 @@ pub fn compile(program: Vec<Operation>) -> Result<PathBuf, CodegenError> {
         LLVM_InitializeAllAsmPrinters();
     });
     let context = Context::new();
-    let mlir_module = context.compile(&program)?;
-    compile_to_object(&mlir_module)
+    let mlir_module = context.compile(&program, &output_file)?;
+    compile_to_object(&mlir_module, output_file)
 }
 
 /// Converts a module to an object.
@@ -60,10 +63,11 @@ pub fn compile(program: Vec<Operation>) -> Result<PathBuf, CodegenError> {
 ///
 /// Returns the path to the object.
 // TODO: pass options to the function
-pub fn compile_to_object(module: &MLIRModule<'_>) -> Result<PathBuf, CodegenError> {
-    // TODO: put a proper target_file here
-    let target_file = PathBuf::from("output.o");
-    // let target_file = session.output_file.with_extension("o");
+pub fn compile_to_object(
+    module: &MLIRModule<'_>,
+    output_file: impl AsRef<Path>,
+) -> Result<PathBuf, CodegenError> {
+    let target_file = output_file.as_ref().with_extension("o");
 
     // TODO: Rework so you can specify target and host features, etc.
     // Right now it compiles for the native cpu feature set and arch
@@ -213,7 +217,7 @@ pub fn compile_binary(
     program: Vec<Operation>,
     output_file: impl AsRef<Path>,
 ) -> Result<(), CodegenError> {
-    let object_file = compile(program)?;
+    let object_file = compile(program, &output_file)?;
     link_binary(object_file, &output_file);
     Ok(())
 }

@@ -24,13 +24,13 @@ use melior::{
 use std::{
     ffi::CStr,
     mem::MaybeUninit,
-    path::PathBuf,
+    path::Path,
     ptr::{addr_of_mut, null_mut},
 };
 
 use crate::{
     codegen::{context::CodegenCtx, operations::generate_code_for_op, run_pass_manager},
-    constants::{MAX_STACK_ELEMENTS, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
+    constants::{MAX_STACK_SIZE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
     errors::CodegenError,
     module::MLIRModule,
     opcodes::Operation,
@@ -57,7 +57,11 @@ impl Context {
         Self { melior_context }
     }
 
-    pub fn compile(&self, program: &[Operation]) -> Result<MLIRModule, CodegenError> {
+    pub fn compile(
+        &self,
+        program: &[Operation],
+        output_file: impl AsRef<Path>,
+    ) -> Result<MLIRModule, CodegenError> {
         let target_triple = get_target_triple();
 
         let context = &self.melior_context;
@@ -98,10 +102,8 @@ impl Context {
 
         assert!(melior_module.as_operation().verify());
 
-        std::fs::write(
-            PathBuf::from("generated.mlir"),
-            melior_module.as_operation().to_string(),
-        )?;
+        let filename = output_file.as_ref().with_extension("mlir");
+        std::fs::write(filename, melior_module.as_operation().to_string())?;
 
         // TODO: Add proper error handling.
         run_pass_manager(context, &mut melior_module)?;
@@ -117,7 +119,8 @@ impl Context {
         }
 
         // Output MLIR
-        std::fs::write("after-pass.mlir", melior_module.as_operation().to_string())?;
+        let filename = output_file.as_ref().with_extension("after-pass.mlir");
+        std::fs::write(filename, melior_module.as_operation().to_string())?;
 
         Ok(MLIRModule::new(melior_module))
     }
@@ -199,29 +202,24 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
 
     // Setup the stack, memory, etc.
     let setup_block = generate_stack_setup_block(context, module)?;
-
-    let mut last_block = setup_block;
+    let mut last_block = main_region.append_block(setup_block);
 
     // Generate code for the program
     for op in operations {
-        let block = generate_code_for_op(codegen_ctx, &main_region, op.clone())?;
+        let (block_start, block_end) = generate_code_for_op(codegen_ctx, &main_region, op.clone())?;
 
-        last_block.append_operation(cf::br(&block, &[], location));
-        main_region.append_block(last_block);
-        last_block = block;
+        last_block.append_operation(cf::br(&block_start, &[], location));
+        last_block = block_end;
     }
 
-    let return_block = Block::new(&[]);
+    let return_block = main_region.append_block(Block::new(&[]));
     last_block.append_operation(cf::br(&return_block, &[], location));
-    main_region.append_block(last_block);
 
     // Setup return operation
     // This returns the last element of the stack
+    // TODO: handle case where stack is empty stack
     let return_value = stack_pop(context, &return_block)?;
     return_block.append_operation(func::r#return(&[return_value], location));
-
-    // Append the return operation
-    main_region.append_block(return_block);
 
     let main_func = func::func(
         context,
@@ -267,7 +265,7 @@ fn generate_stack_setup_block<'c>(
     let stack_size = block
         .append_operation(arith::constant(
             context,
-            IntegerAttribute::new(uint256.into(), MAX_STACK_ELEMENTS).into(),
+            IntegerAttribute::new(uint256.into(), MAX_STACK_SIZE as i64).into(),
             location,
         ))
         .result(0)?
