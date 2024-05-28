@@ -1,9 +1,6 @@
 use melior::{
-    dialect::{arith, cf, func},
-    ir::{
-        attribute::IntegerAttribute, r#type::IntegerType, Attribute, Block, BlockRef, Location,
-        Region,
-    },
+    dialect::{arith, cf},
+    ir::{Attribute, Block, BlockRef, Location, Region},
     Context as MeliorContext,
 };
 use num_bigint::BigUint;
@@ -12,7 +9,7 @@ use super::context::CodegenCtx;
 use crate::{
     errors::CodegenError,
     opcodes::Operation,
-    utils::{check_stack_has_space_for, stack_push},
+    utils::{check_stack_has_space_for, revert_block, stack_push},
 };
 
 /// Generates blocks for target [`Operation`].
@@ -38,24 +35,12 @@ fn codegen_push<'c, 'r>(
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
-    let uint256 = IntegerType::new(context, 256);
 
     // Check there's enough space in stack
     let flag = check_stack_has_space_for(context, &start_block, 1)?;
 
     // Create REVERT block
-    // TODO: create only one revert block and use it for all revert operations
-    let revert_block = region.append_block(Block::new(&[]));
-
-    let exit_code = revert_block
-        .append_operation(arith::constant(
-            context,
-            IntegerAttribute::new(uint256.into(), 1_i64).into(),
-            location,
-        ))
-        .result(0)?;
-
-    revert_block.append_operation(func::r#return(&[exit_code.into()], location));
+    let revert_block = region.append_block(revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 

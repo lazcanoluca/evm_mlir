@@ -1,4 +1,4 @@
-use evm_mlir::{compile_binary, opcodes::Operation};
+use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
 use tempfile::NamedTempFile;
 
 fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
@@ -21,7 +21,7 @@ fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
 
 fn run_program_assert_stack_overflow(program: Vec<Operation>) {
     // TODO: design a way to check for stack overflow
-    run_program_assert_result(program, 1);
+    run_program_assert_result(program, REVERT_EXIT_CODE);
 }
 
 #[test]

@@ -1,5 +1,6 @@
 use melior::{
     dialect::{
+        arith, func,
         llvm::{self, r#type::pointer, LoadStoreOptions},
         ods,
     },
@@ -12,7 +13,7 @@ use melior::{
 };
 
 use crate::{
-    constants::{MAX_STACK_SIZE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
+    constants::{MAX_STACK_SIZE, REVERT_EXIT_CODE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
     errors::CodegenError,
 };
 
@@ -229,6 +230,22 @@ pub fn check_stack_has_space_for<'ctx>(
         .result(0)?;
 
     Ok(flag.into())
+}
+
+pub fn revert_block(context: &MeliorContext) -> Result<Block, CodegenError> {
+    // TODO: create only one revert block and use it for all revert operations
+    let location = Location::unknown(context);
+    let uint8 = IntegerType::new(context, 8);
+    let revert_block = Block::new(&[]);
+
+    let constant_value = IntegerAttribute::new(uint8.into(), REVERT_EXIT_CODE as _).into();
+
+    let exit_code = revert_block
+        .append_operation(arith::constant(context, constant_value, location))
+        .result(0)?;
+
+    revert_block.append_operation(func::r#return(&[exit_code.into()], location));
+    Ok(revert_block)
 }
 
 pub mod llvm_mlir {
