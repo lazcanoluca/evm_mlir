@@ -278,6 +278,7 @@ pub fn link_binary(
     let mut linker = std::process::Command::new("ld");
     let proc = linker.args(args.iter()).spawn()?;
     let output = proc.wait_with_output()?;
+    println!("output_filename: {output_filename}");
 
     // TODO: propagate
     assert!(output.status.success());
