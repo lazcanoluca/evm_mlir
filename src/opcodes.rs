@@ -15,8 +15,6 @@ impl From<u8> for Opcode {
 
 #[derive(Debug, Clone)]
 pub enum Operation {
-    Stop,
-    Add,
     Push32([u8; 32]),
 }
 
