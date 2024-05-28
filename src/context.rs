@@ -216,8 +216,10 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
 
     // Setup return operation
     // This returns the last element of the stack
-    // TODO: handle case where stack is empty stack
+    // TODO: handle case where stack is empty
     let stack_top = stack_pop(context, &return_block)?;
+    // Truncate the value to 8 bits.
+    // NOTE: this is due to amd64 using two registers (128 bits) for return values.
     let uint8 = IntegerType::new(context, 8);
     let exit_code = return_block
         .append_operation(arith::trunci(stack_top, uint8.into(), location))
