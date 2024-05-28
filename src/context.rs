@@ -195,7 +195,6 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
     let operations = codegen_ctx.program;
 
     let location = Location::unknown(context);
-    let uint256 = IntegerType::new(context, 256);
 
     // Build a region for the main function
     let main_region = Region::new();
@@ -218,13 +217,17 @@ fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
     // Setup return operation
     // This returns the last element of the stack
     // TODO: handle case where stack is empty stack
-    let return_value = stack_pop(context, &return_block)?;
-    return_block.append_operation(func::r#return(&[return_value], location));
+    let stack_top = stack_pop(context, &return_block)?;
+    let uint8 = IntegerType::new(context, 8);
+    let exit_code = return_block
+        .append_operation(arith::trunci(stack_top, uint8.into(), location))
+        .result(0)?;
+    return_block.append_operation(func::r#return(&[exit_code.into()], location));
 
     let main_func = func::func(
         context,
         StringAttribute::new(context, "main"),
-        TypeAttribute::new(FunctionType::new(context, &[], &[uint256.into()]).into()),
+        TypeAttribute::new(FunctionType::new(context, &[], &[uint8.into()]).into()),
         main_region,
         &[],
         location,

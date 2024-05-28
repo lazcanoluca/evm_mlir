@@ -242,14 +242,15 @@ pub fn link_binary(
             };
 
             let mut args = vec![
-                // "-pie",
-                // "--hash-style=gnu",
-                // "--eh-frame-hdr",
+                "-pie",
+                "--hash-style=gnu",
+                "--eh-frame-hdr",
                 // "--dynamic-linker",
                 // "/lib64/ld-linux-x86-64.so.2",
-                // "-m",
-                // "elf_x86_64",
-                scrt1, crti,
+                "-m",
+                "elf_x86_64",
+                scrt1,
+                crti,
             ];
 
             args.extend(&["-o", &output_filename]);
@@ -258,8 +259,8 @@ pub fn link_binary(
                 "-L/lib64",
                 "-L/usr/lib64",
                 "-L/lib/x86_64-linux-gnu",
-                // "-zrelro",
-                // "--no-as-needed",
+                "-zrelro",
+                "--no-as-needed",
                 "-lc",
                 "-O1",
                 crtn,

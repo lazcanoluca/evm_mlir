@@ -38,7 +38,7 @@ endif
 
 deps-macos:
 	-brew install llvm@18 --quiet
-	@echo "You need to run `source scripts/env-macos.sh` to setup the environment."
+	@echo "You need to run source scripts/env-macos.sh to setup the environment."
 
 lint:
 	cargo fmt --all -- --check
@@ -47,5 +47,5 @@ lint:
 fmt:
 	cargo fmt --all
 
-test: check-deps
+test:
 	cargo nextest run --workspace --all-features
