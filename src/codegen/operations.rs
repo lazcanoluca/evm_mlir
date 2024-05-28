@@ -21,7 +21,6 @@ pub fn generate_code_for_op<'c, 'r>(
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     match op {
         Operation::Push32(x) => codegen_push(context, region, x),
-        _ => todo!("opcode '{op:?}' wasn't implemented yet"),
     }
 }
 

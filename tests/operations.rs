@@ -8,7 +8,6 @@ fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
 
     compile_binary(program, &output_file).expect("failed to compile program");
 
-    println!("output file: {:?}", output_file);
     assert!(output_file.exists(), "output file does not exist");
 
     let mut res = std::process::Command::new(&output_file)
