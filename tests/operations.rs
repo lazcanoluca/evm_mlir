@@ -23,6 +23,12 @@ fn run_program_assert_stack_overflow(program: Vec<Operation>) {
     run_program_assert_result(program, REVERT_EXIT_CODE);
 }
 
+fn new_32_byte_immediate(value: u8) -> [u8; 32] {
+    let mut arr = [0; 32];
+    arr[31] = value;
+    arr
+}
+
 #[test]
 fn push32_once() {
     let the_answer = 42;
@@ -55,4 +61,16 @@ fn push32_stack_overflow() {
     let program = vec![Operation::Push32([88; 32]); 1025];
 
     run_program_assert_stack_overflow(program);
+}
+
+#[test]
+fn push_push_add() {
+    let (a, b) = (11, 31);
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Add,
+    ];
+    run_program_assert_result(program, a + b);
 }
