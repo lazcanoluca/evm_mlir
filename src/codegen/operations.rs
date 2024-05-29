@@ -9,7 +9,9 @@ use super::context::CodegenCtx;
 use crate::{
     errors::CodegenError,
     opcodes::Operation,
-    utils::{check_stack_has_space_for, revert_block, stack_push},
+    utils::{
+        check_stack_has_at_least, check_stack_has_space_for, revert_block, stack_pop, stack_push,
+    },
 };
 
 /// Generates blocks for target [`Operation`].
@@ -21,6 +23,7 @@ pub fn generate_code_for_op<'c, 'r>(
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     match op {
         Operation::Push32(x) => codegen_push(context, region, x),
+        Operation::Add => codegen_add(context, region),
     }
 }
 
@@ -62,6 +65,45 @@ fn codegen_push<'c, 'r>(
         .into();
 
     stack_push(context, &ok_block, constant_value)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_add<'c, 'r>(
+    codegen_ctx: CodegenCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &codegen_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::addi(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
 
     Ok((start_block, ok_block))
 }
