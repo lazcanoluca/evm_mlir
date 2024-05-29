@@ -112,7 +112,7 @@ fn codegen_add<'c, 'r>(
 fn codegen_sub<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
-) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {    
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
