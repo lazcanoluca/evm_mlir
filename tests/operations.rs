@@ -129,8 +129,8 @@ fn div_with_zero_denominator() {
     let expected_result = 0;
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
         Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push32(new_32_byte_immediate(a)),
         Operation::Div,
     ];
     run_program_assert_result(program, expected_result);
@@ -143,8 +143,8 @@ fn div_with_zero_numerator() {
     let expected_result = 0;
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
         Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push32(new_32_byte_immediate(a)),
         Operation::Div,
     ];
     run_program_assert_result(program, expected_result);
