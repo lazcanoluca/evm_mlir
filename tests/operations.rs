@@ -45,10 +45,7 @@ fn push0_once() {
 #[test]
 fn push1_twice() {
     let the_answer = 42;
-    let program = vec![
-        Operation::Push1([0; 1]),
-        Operation::Push1([the_answer; 1]),
-    ];
+    let program = vec![Operation::Push1([0; 1]), Operation::Push1([the_answer; 1])];
     run_program_assert_result(program, the_answer);
 }
 
