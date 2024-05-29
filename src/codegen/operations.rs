@@ -70,8 +70,8 @@ fn codegen_push<'c, 'r>(
 }
 
 fn codegen_add<'c, 'r>(
-    _codegen_ctx: CodegenCtx<'c>,
-    _region: &'r Region<'c>,
+    codegen_ctx: CodegenCtx<'c>,
+    region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
