@@ -110,10 +110,34 @@ fn codegen_add<'c, 'r>(
 }
 
 fn codegen_pop<'c, 'r>(
-    _codegen_ctx: CodegenCtx<'c>,
-    _region: &'r Region<'c>,
+    codegen_ctx: CodegenCtx<'c>,
+    region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
-    todo!()
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &codegen_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's at least 1 element in stack
+    let flag = check_stack_has_at_least(context, &start_block, 1)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    stack_pop(context, &ok_block)?;
+
+    Ok((start_block, ok_block))
 }
 
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
