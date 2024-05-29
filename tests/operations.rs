@@ -79,3 +79,20 @@ fn push_push_add() {
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
 }
+
+#[test]
+fn push_push_mul() {
+    let (a, b) = (2, 2);
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, a * b);
+}
+
+#[test]
+fn mul_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mul]);
+}
