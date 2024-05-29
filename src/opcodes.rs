@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum Opcode {
     ADD = 0x01,
+    DIV = 0x04,
     PUSH32 = 0x7F,
     UNUSED,
 }
@@ -10,6 +11,7 @@ impl From<u8> for Opcode {
         match opcode {
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
+            x if x == Opcode::DIV as u8 => Opcode::DIV,
             _ => Opcode::UNUSED,
         }
     }
@@ -19,6 +21,7 @@ impl From<u8> for Opcode {
 pub enum Operation {
     Add,
     Push32([u8; 32]),
+    Div,
 }
 
 impl Operation {
@@ -32,6 +35,7 @@ impl Operation {
             };
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
+                Opcode::DIV => Operation::Div,
                 Opcode::PUSH32 => {
                     i += 1;
                     let x = bytecode[i..(i + 32)].try_into().unwrap();

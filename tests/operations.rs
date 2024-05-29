@@ -79,3 +79,64 @@ fn push_push_add() {
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
 }
+
+#[test]
+fn div_without_remainder() {
+    let (a, b) = (20, 5);
+
+    let expected_result = 4;
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_remainder() {
+    let (a, b) = (21, 5);
+
+    let expected_result = 4;
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_denominator() {
+    let (a, b) = (5, 0);
+
+    let expected_result = 0;
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_numerator() {
+    let (a, b) = (0, 10);
+
+    let expected_result = 0;
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Div]);
+}
