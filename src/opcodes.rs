@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum Opcode {
     ADD = 0x01,
+    EXP = 0x0A,
     PUSH32 = 0x7F,
     POP = 0x50,
     UNUSED,
@@ -10,6 +11,7 @@ impl From<u8> for Opcode {
     fn from(opcode: u8) -> Opcode {
         match opcode {
             x if x == Opcode::ADD as u8 => Opcode::ADD,
+            x if x == Opcode::EXP as u8 => Opcode::EXP,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::POP as u8 => Opcode::POP,
             _ => Opcode::UNUSED,
@@ -20,6 +22,7 @@ impl From<u8> for Opcode {
 #[derive(Debug, Clone)]
 pub enum Operation {
     Add,
+    Exp,
     Push32([u8; 32]),
     Pop,
 }
@@ -35,6 +38,7 @@ impl Operation {
             };
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
+                Opcode::EXP => Operation::Exp,
                 Opcode::PUSH32 => {
                     i += 1;
                     let x = bytecode[i..(i + 32)].try_into().unwrap();
