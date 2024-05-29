@@ -8,3 +8,12 @@ license = "LICENSE"
 keywords = ["ethereum", "evm"]
 
 [dependencies]
+llvm-sys = "180.0.0"
+melior = { version = "0.18.1", features = ["ods-dialects"] }
+mlir-sys = "0.2.2"
+num-bigint = "0.4.5"
+tempfile = "3.10.1"
+thiserror = "1.0.57"
+
+[build-dependencies]
+cc = "1.0.83"
