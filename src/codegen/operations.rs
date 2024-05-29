@@ -25,6 +25,7 @@ pub fn generate_code_for_op<'c, 'r>(
         Operation::Push32(x) => codegen_push(context, region, x),
         Operation::Add => codegen_add(context, region),
         Operation::Pop => codegen_pop(context, region),
+        Operation::Sar => codegen_sar(context, region),
     }
 }
 
@@ -138,6 +139,13 @@ fn codegen_pop<'c, 'r>(
     stack_pop(context, &ok_block)?;
 
     Ok((start_block, ok_block))
+}
+
+fn codegen_sar<'c, 'r>(
+    _codegen_ctx: CodegenCtx<'c>,
+    _region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    todo!()
 }
 
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
