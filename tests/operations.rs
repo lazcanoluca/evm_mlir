@@ -18,7 +18,7 @@ fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
     assert_eq!(output.code().expect("no exit code"), expected_result.into());
 }
 
-fn run_program_assert_stack_overflow(program: Vec<Operation>) {
+fn run_program_assert_revert(program: Vec<Operation>) {
     // TODO: design a way to check for stack overflow
     run_program_assert_result(program, REVERT_EXIT_CODE);
 }
@@ -60,7 +60,7 @@ fn push32_stack_overflow() {
     // Push 1025 times
     let program = vec![Operation::Push32([88; 32]); 1025];
 
-    run_program_assert_stack_overflow(program);
+    run_program_assert_revert(program);
 }
 
 #[test]
@@ -73,4 +73,9 @@ fn push_push_add() {
         Operation::Add,
     ];
     run_program_assert_result(program, a + b);
+}
+
+#[test]
+fn add_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Add]);
 }
