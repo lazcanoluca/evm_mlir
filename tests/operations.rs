@@ -29,6 +29,29 @@ fn new_32_byte_immediate(value: u8) -> [u8; 32] {
     arr
 }
 
+fn new_16_byte_immediate(value: u8) -> [u8; 16] {
+    let mut arr = [0; 16];
+    arr[15] = value;
+    arr
+}
+
+#[test]
+fn push0_once() {
+    let the_answer = 0;
+    let program = vec![Operation::Push0];
+    run_program_assert_result(program, the_answer);
+}
+
+#[test]
+fn push1_twice() {
+    let the_answer = 42;
+    let program = vec![
+        Operation::Push1([0; 1]),
+        Operation::Push1([the_answer; 1]),
+    ];
+    run_program_assert_result(program, the_answer);
+}
+
 #[test]
 fn push32_once() {
     let the_answer = 42;
@@ -69,7 +92,7 @@ fn push_push_add() {
 
     let program = vec![
         Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push16(new_16_byte_immediate(b)),
         Operation::Add,
     ];
     run_program_assert_result(program, a + b);
