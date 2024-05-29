@@ -22,49 +22,48 @@ pub fn generate_code_for_op<'c, 'r>(
     op: Operation,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     match op {
-        Operation::Push0 => todo!(),
-        Operation::Push1(x) => todo!(),
-        Operation::Push2(x) => todo!(),
-        Operation::Push3(x) => todo!(),
-        Operation::Push4(x) => todo!(),
-        Operation::Push5(x) => todo!(),
-        Operation::Push6(x) => todo!(),
-        Operation::Push7(x) => todo!(),
-        Operation::Push8(x) => todo!(),
-        Operation::Push9(x) => todo!(),
-        Operation::Push10(x) => todo!(),
-        Operation::Push11(x) => todo!(),
-        Operation::Push12(x) => todo!(),
-        Operation::Push13(x) => todo!(),
-        Operation::Push14(x) => todo!(),
-        Operation::Push15(x) => todo!(),
-        Operation::Push16(x) => todo!(),
-        Operation::Push17(x) => todo!(),
-        Operation::Push18(x) => todo!(),
-        Operation::Push19(x) => todo!(),
-        Operation::Push20(x) => todo!(),
-        Operation::Push21(x) => todo!(),
-        Operation::Push22(x) => todo!(),
-        Operation::Push23(x) => todo!(),
-        Operation::Push24(x) => todo!(),
-        Operation::Push25(x) => todo!(),
-        Operation::Push26(x) => todo!(),
-        Operation::Push27(x) => todo!(),
-        Operation::Push28(x) => todo!(),
-        Operation::Push29(x) => todo!(),
-        Operation::Push30(x) => todo!(),
-        Operation::Push31(x) => todo!(),
+        Operation::Push0 => codegen_push(context, region, [0; 32]),
+        Operation::Push1(x) => codegen_push(context, region, x),
+        Operation::Push2(x) => codegen_push(context, region, x),
+        Operation::Push3(x) => codegen_push(context, region, x),
+        Operation::Push4(x) => codegen_push(context, region, x),
+        Operation::Push5(x) => codegen_push(context, region, x),
+        Operation::Push6(x) => codegen_push(context, region, x),
+        Operation::Push7(x) => codegen_push(context, region, x),
+        Operation::Push8(x) => codegen_push(context, region, x),
+        Operation::Push9(x) => codegen_push(context, region, x),
+        Operation::Push10(x) => codegen_push(context, region, x),
+        Operation::Push11(x) => codegen_push(context, region, x),
+        Operation::Push12(x) => codegen_push(context, region, x),
+        Operation::Push13(x) => codegen_push(context, region, x),
+        Operation::Push14(x) => codegen_push(context, region, x),
+        Operation::Push15(x) => codegen_push(context, region, x),
+        Operation::Push16(x) => codegen_push(context, region, x),
+        Operation::Push17(x) => codegen_push(context, region, x),
+        Operation::Push18(x) => codegen_push(context, region, x),
+        Operation::Push19(x) => codegen_push(context, region, x),
+        Operation::Push20(x) => codegen_push(context, region, x),
+        Operation::Push21(x) => codegen_push(context, region, x),
+        Operation::Push22(x) => codegen_push(context, region, x),
+        Operation::Push23(x) => codegen_push(context, region, x),
+        Operation::Push24(x) => codegen_push(context, region, x),
+        Operation::Push25(x) => codegen_push(context, region, x),
+        Operation::Push26(x) => codegen_push(context, region, x),
+        Operation::Push27(x) => codegen_push(context, region, x),
+        Operation::Push28(x) => codegen_push(context, region, x),
+        Operation::Push29(x) => codegen_push(context, region, x),
+        Operation::Push30(x) => codegen_push(context, region, x),
+        Operation::Push31(x) => codegen_push(context, region, x),
         Operation::Push32(x) => codegen_push(context, region, x),
         Operation::Add => codegen_add(context, region),
         Operation::Pop => codegen_pop(context, region),
     }
 }
 
-// TODO: use const generics to generalize for pushN
-fn codegen_push<'c, 'r>(
+fn codegen_push<'c, 'r, const N: usize>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
-    value_to_push: [u8; 32],
+    value_to_push: [u8; N],
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
@@ -172,7 +171,7 @@ fn codegen_pop<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
-fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
+fn integer_constant<const N: usize>(context: &MeliorContext, value: [u8; N]) -> Attribute {
     let str_value = BigUint::from_bytes_be(&value).to_string();
     // TODO: should we handle this error?
     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
