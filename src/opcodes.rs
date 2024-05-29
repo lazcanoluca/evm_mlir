@@ -40,7 +40,7 @@ impl Operation {
                     let x = bytecode[i..(i + 32)].try_into().unwrap();
                     i += 31;
                     Operation::Push32(x)
-                },
+                }
                 Opcode::POP => Operation::Pop,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
