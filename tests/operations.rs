@@ -76,6 +76,18 @@ fn push_push_add() {
 }
 
 #[test]
+fn push_push_sub() {
+    let (a, b) = (11, 31);
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Sub,
+    ];
+    run_program_assert_result(program, b - a);
+}
+
+#[test]
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
 }
