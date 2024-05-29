@@ -74,7 +74,7 @@ pub fn stack_pop<'ctx>(
     let res = block.append_operation(llvm::store(
         context,
         old_stack_ptr.into(),
-        stack_ptr.into(),
+        stack_ptr_ptr.into(),
         location,
         LoadStoreOptions::default(),
     ));
