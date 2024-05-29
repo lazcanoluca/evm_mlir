@@ -149,6 +149,7 @@ pub fn stack_push<'ctx>(
     Ok(())
 }
 
+/// Generates code for checking if the stack has enough space for `element_count` more elements.
 pub fn check_stack_has_space_for<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
@@ -222,7 +223,98 @@ pub fn check_stack_has_space_for<'ctx>(
                 subtracted_stack_ptr.into(),
                 stack_baseptr.into(),
                 // 7 should be the "ule" predicate enum value
-                IntegerAttribute::new(IntegerType::new(context, 64).into(), 7).into(),
+                IntegerAttribute::new(
+                    IntegerType::new(context, 64).into(),
+                    /* "ule" predicate enum value */ 7,
+                )
+                .into(),
+                location,
+            )
+            .into(),
+        )
+        .result(0)?;
+
+    Ok(flag.into())
+}
+
+/// Generates code for checking if the stack has enough space for `element_count` more elements.
+pub fn check_stack_has_at_least<'ctx>(
+    context: &'ctx MeliorContext,
+    block: &'ctx Block,
+    element_count: u32,
+) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+    debug_assert!(element_count < MAX_STACK_SIZE as u32);
+    let location = Location::unknown(context);
+    let ptr_type = pointer(context, 0);
+    let uint256 = IntegerType::new(context, 256);
+
+    // Get address of stack pointer global
+    let stack_ptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_PTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Load stack pointer
+    let stack_ptr = block
+        .append_operation(llvm::load(
+            context,
+            stack_ptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?;
+
+    // Get address of stack base pointer global
+    let stack_baseptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_BASEPTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Load stack base pointer
+    let stack_baseptr = block
+        .append_operation(llvm::load(
+            context,
+            stack_baseptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?;
+
+    // Compare `subtracted_stack_ptr = stack_ptr - element_count`
+    let subtracted_stack_ptr = block
+        .append_operation(llvm::get_element_ptr(
+            context,
+            stack_ptr.into(),
+            DenseI32ArrayAttribute::new(context, &[-(element_count as i32)]),
+            uint256.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Compare `stack_ptr - element_count >= stack_baseptr`
+    let flag = block
+        .append_operation(
+            ods::llvm::icmp(
+                context,
+                IntegerType::new(context, 1).into(),
+                subtracted_stack_ptr.into(),
+                stack_baseptr.into(),
+                IntegerAttribute::new(
+                    IntegerType::new(context, 64).into(),
+                    /* "uge" predicate enum value */ 9,
+                )
+                .into(),
                 location,
             )
             .into(),
