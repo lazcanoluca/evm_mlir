@@ -8,7 +8,7 @@ use num_bigint::BigUint;
 use super::context::CodegenCtx;
 use crate::{
     errors::CodegenError,
-    opcodes::Operation,
+    program::Operation,
     utils::{
         check_stack_has_at_least, check_stack_has_space_for, revert_block, stack_pop, stack_push,
     },
@@ -26,6 +26,7 @@ pub fn generate_code_for_op<'c, 'r>(
         Operation::Add => codegen_add(context, region),
         Operation::Mul => codegen_mul(context, region),
         Operation::Pop => codegen_pop(context, region),
+        Operation::Jumpdest(_pc) => todo!("Jumpdest not implemented"),
     }
 }
 

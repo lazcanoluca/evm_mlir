@@ -71,7 +71,7 @@ pub enum Opcode {
     // PC = 0x58,
     // MSIZE = 0x59,
     // GAS = 0x5A,
-    // JUMPDEST = 0x5B,
+    JUMPDEST = 0x5B,
     // TLOAD = 0x5C,
     // TSTORE = 0x5D,
     // MCOPY = 0x5E,
@@ -166,6 +166,7 @@ impl From<u8> for Opcode {
         match opcode {
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::MUL as u8 => Opcode::MUL,
+            x if x == Opcode::JUMPDEST as u8 => Opcode::JUMPDEST,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::POP as u8 => Opcode::POP,
             _ => Opcode::UNUSED,
@@ -177,34 +178,60 @@ impl From<u8> for Opcode {
 pub enum Operation {
     Add,
     Mul,
-    Push32([u8; 32]),
     Pop,
+    Jumpdest(usize),
+    Push32([u8; 32]),
 }
 
-impl Operation {
-    pub fn from_bytecode(bytecode: Vec<u8>) -> Vec<Self> {
-        let mut operations = vec![];
-        let mut i = 0;
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub(crate) operations: Vec<Operation>,
+    #[allow(dead_code)]
+    pub(crate) jumpdests: Vec<usize>,
+}
 
-        while i < bytecode.len() {
-            let Some(opcode) = bytecode.get(i).copied() else {
+impl Program {
+    pub fn from_bytecode(bytecode: &[u8]) -> Self {
+        let mut operations = vec![];
+        let mut pc = 0;
+
+        while pc < bytecode.len() {
+            let Some(opcode) = bytecode.get(pc).copied() else {
                 break;
             };
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
                 Opcode::MUL => Operation::Mul,
+                Opcode::POP => Operation::Pop,
                 Opcode::PUSH32 => {
-                    i += 1;
-                    let x = bytecode[i..(i + 32)].try_into().unwrap();
-                    i += 31;
+                    pc += 1;
+                    let x = bytecode[pc..(pc + 32)].try_into().unwrap();
+                    pc += 31;
                     Operation::Push32(x)
                 }
-                Opcode::POP => Operation::Pop,
+                Opcode::JUMPDEST => Operation::Jumpdest(pc),
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
-            i += 1;
+            pc += 1;
         }
-        operations
+        Self::from(operations)
+    }
+}
+
+impl From<Vec<Operation>> for Program {
+    fn from(operations: Vec<Operation>) -> Program {
+        let jumpdests = operations
+            .iter()
+            .filter_map(|op| match op {
+                Operation::Jumpdest(pc) => Some(*pc),
+                _ => None,
+            })
+            .collect();
+
+        Program {
+            operations,
+            jumpdests,
+        }
     }
 }

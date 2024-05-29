@@ -1,6 +1,6 @@
 use melior::{ir::Module as MeliorModule, Context as MeliorContext};
 
-use crate::opcodes::Operation;
+use crate::program::Program;
 
 /// Global codegen context
 #[derive(Debug, Clone, Copy)]
@@ -12,5 +12,5 @@ pub(crate) struct CodegenCtx<'a> {
     /// The compile session info.
     // pub session: &'a Session,
     /// The program IR.
-    pub program: &'a [Operation],
+    pub program: &'a Program,
 }

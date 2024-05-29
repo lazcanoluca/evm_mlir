@@ -33,7 +33,7 @@ use crate::{
     constants::{MAX_STACK_SIZE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
     errors::CodegenError,
     module::MLIRModule,
-    opcodes::Operation,
+    program::Program,
     utils::{llvm_mlir, stack_pop},
 };
 
@@ -59,7 +59,7 @@ impl Context {
 
     pub fn compile(
         &self,
-        program: &[Operation],
+        program: &Program,
         output_file: impl AsRef<Path>,
     ) -> Result<MLIRModule, CodegenError> {
         let target_triple = get_target_triple();
@@ -192,7 +192,7 @@ pub fn get_data_layout_rep() -> Result<String, CodegenError> {
 fn compile_program(codegen_ctx: CodegenCtx) -> Result<(), CodegenError> {
     let context = codegen_ctx.mlir_context;
     let module = codegen_ctx.mlir_module;
-    let operations = codegen_ctx.program;
+    let operations = &codegen_ctx.program.operations;
 
     let location = Location::unknown(context);
 

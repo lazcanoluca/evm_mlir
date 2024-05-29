@@ -1,12 +1,17 @@
-use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
+use evm_mlir::{
+    compile_binary,
+    constants::REVERT_EXIT_CODE,
+    program::{Operation, Program},
+};
 use tempfile::NamedTempFile;
 
-fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
+fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
+    let program = Program::from(operations);
     let output_file = NamedTempFile::new()
         .expect("failed to generate tempfile")
         .into_temp_path();
 
-    compile_binary(program, &output_file).expect("failed to compile program");
+    compile_binary(&program, &output_file).expect("failed to compile program");
 
     assert!(output_file.exists(), "output file does not exist");
 
