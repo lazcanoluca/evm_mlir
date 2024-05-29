@@ -109,6 +109,7 @@ pub enum Opcode {
     PUSH29 = 0x7C,
     PUSH30 = 0x7D,
     PUSH31 = 0x7E,
+    EXP = 0x0A,
     PUSH32 = 0x7F,
     // DUP1 = 0x80,
     // DUP2 = 0x81,
@@ -200,6 +201,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH29 as u8 => Opcode::PUSH29,
             x if x == Opcode::PUSH30 as u8 => Opcode::PUSH30,
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
+            x if x == Opcode::EXP as u8 => Opcode::EXP,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::POP as u8 => Opcode::POP,
             _ => Opcode::UNUSED,
@@ -211,6 +213,7 @@ impl From<u8> for Opcode {
 pub enum Operation {
     Add,
     Mul,
+    Exp,
     Push(BigUint),
     Pop,
 }
@@ -413,6 +416,7 @@ impl Operation {
                     i += 30;
                     Operation::Push(BigUint::from_bytes_be(x))
                 }
+                Opcode::EXP => Operation::Exp,
                 Opcode::PUSH32 => {
                     i += 1;
                     let x = bytecode[i..(i + 32)].try_into().unwrap();

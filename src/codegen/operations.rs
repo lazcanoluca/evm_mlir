@@ -24,6 +24,7 @@ pub fn generate_code_for_op<'c, 'r>(
         Operation::Push(x) => codegen_push(context, region, x),
         Operation::Add => codegen_add(context, region),
         Operation::Mul => codegen_mul(context, region),
+        Operation::Exp => todo!(),
         Operation::Pop => codegen_pop(context, region),
     }
 }
