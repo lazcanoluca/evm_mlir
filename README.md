@@ -97,3 +97,77 @@ There are some example files under `programs/`, for example:
 ```bash
 cargo run programs/push32.bytecode
 ```
+
+## Debugging the compiler
+
+### Compile a program
+
+To generate the necessary artifacts, you need to run `cargo run <filepath>`, with `<filepath>` being the path to a file containing the EVM bytecode to compile.
+
+Writing EVM bytecode directly can be a bit difficult, so you can edit [src/main.rs](../src/main.rs), modifying the `program` variable with the structure of your EVM program. After that you just run `cargo run`.
+
+An example edit would look like this:
+
+```rust
+fn main() {
+    let program = vec![
+            Operation::Push32([0; 32]),
+            Operation::Push32([42; 32]),
+            Operation::Add,
+        ];
+    let output_file = "some_other_filename";
+    compile_binary(program, output_file).unwrap();
+}
+```
+
+### Inspecting the artifacts
+
+The most useful ones to inspect are the MLIR-IR (`<name>.mlir`) and Assembly (`<name>.asm`) files. The first one has a one-to-one mapping with the operations added in the compiler, while the second one contains the instructions that are executed by your machine.
+
+The other generated artifacts are:
+
+- Semi-optimized MLIR-IR (`<name>.after-pass.mlir`)
+- LLVM-IR (`<name>.ll`)
+- Object file (`<name>.o`)
+- Executable (`<name>`)
+
+### Running with a debugger
+
+Once we have the executable, we can run it with a debugger (here we use `lldb`, but you can use others). To run with `lldb`, use `lldb <name>`.
+
+To run until we reach our main function, we can use:
+
+```lldb
+br set -n main
+run
+```
+
+#### Running a single step
+
+`thread step-inst`
+
+#### Reading registers
+
+All registers: `register read`
+
+The `x0` register: `register read x0`
+
+#### Reading memory
+
+To inspect the memory at `<address>`: `memory read <address>`
+
+To inspect the memory at the address given by the register `x0`: `memory read $x0`
+
+#### Reading the EVM stack
+
+To pretty-print the EVM stack at address `X`: `memory read -s32 -fu -c4 X`
+
+Reference:
+
+- The `-s32` flag groups the bytes in 32-byte chunks.
+- The `-fu` flag interprets the chunks as unsigned integers.
+- The `-c4` flag includes 4 chunks: the one at the given address plus the three next chunks.
+
+#### Restarting the program
+
+To restart the program, just use `run` again.
