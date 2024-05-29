@@ -145,7 +145,7 @@ impl Operation {
                 Opcode::PUSH2 => {
                     i += 1;
                     let x = bytecode[i..(i + 2)].try_into().unwrap();
-                    i += 2;
+                    i += 1;
                     Operation::Push2(x)
                 }
                 Opcode::PUSH3 => {
