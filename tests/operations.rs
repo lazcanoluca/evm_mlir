@@ -95,6 +95,20 @@ fn div_without_remainder() {
 }
 
 #[test]
+fn div_signed_division() {
+    let (a, b) = (-10, 2);
+
+    let expected_result = 5;
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
 fn div_with_remainder() {
     let (a, b) = (21, 5);
 
