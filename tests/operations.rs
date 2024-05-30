@@ -26,35 +26,40 @@ fn run_program_assert_revert(program: Vec<Operation>) {
 
 #[test]
 fn push_once() {
-    let the_answer: u8 = 0_u8;
+    let value = BigUint::from(5_u8);
 
-    // Test for PUSH0, PUSH1, ... , PUSH32
-    for i in 0..33 {
-        let bytes = vec![the_answer; i];
-        let value = BigUint::from_bytes_be(&bytes);
-        let program = vec![Operation::Push(value)];
-        run_program_assert_result(program, the_answer);
+    // For PUSH0
+    let shifted_value = BigUint::ZERO << (32 * 8);
+    let program = vec![Operation::Push(shifted_value)];
+    run_program_assert_result(program, 0);
+
+    // For PUSH1, ... , PUSH32
+    for i in 0..32 {
+        let shifted_value: BigUint = value.clone() << (i * 8);
+        let program = vec![Operation::Push(shifted_value.clone())];
+        let expected_result: u8 = (shifted_value % 256_u32).try_into().unwrap();
+        run_program_assert_result(program, expected_result);
     }
 }
 
 #[test]
 fn push_twice() {
-    let the_answer: u8 = 42;
+    let the_answer = BigUint::from(42_u8);
 
     let program = vec![
         Operation::Push(BigUint::from(1_u8)),
-        Operation::Push(BigUint::from(the_answer)),
+        Operation::Push(the_answer.clone()),
     ];
-    run_program_assert_result(program, the_answer);
+    run_program_assert_result(program, the_answer.try_into().unwrap());
 }
 
 #[test]
 fn push_fill_stack() {
-    let stack_top: u8 = 88;
+    let stack_top = BigUint::from(88_u8);
 
     // Push 1024 times
-    let program = vec![Operation::Push(BigUint::from(stack_top)); 1024];
-    run_program_assert_result(program, stack_top);
+    let program = vec![Operation::Push(stack_top.clone()); 1024];
+    run_program_assert_result(program, stack_top.try_into().unwrap());
 }
 
 #[test]
@@ -66,14 +71,14 @@ fn push_stack_overflow() {
 
 #[test]
 fn push_push_add() {
-    let (a, b): (u8, u8) = (11, 31);
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
 
     let program = vec![
-        Operation::Push(BigUint::from(a)),
-        Operation::Push(BigUint::from(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Add,
     ];
-    run_program_assert_result(program, a + b);
+    run_program_assert_result(program, (a + b).try_into().unwrap());
 }
 
 #[test]
@@ -86,14 +91,14 @@ fn push_push_pop() {
     // Push two values to the stack and then pop once
     // The program result should be equal to the first
     // pushed value
-    let (a, b): (u8, u8) = (1, 2);
+    let (a, b) = (BigUint::from(1_u8), BigUint::from(2_u8));
 
     let program = vec![
-        Operation::Push(BigUint::from(a)),
-        Operation::Push(BigUint::from(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b),
         Operation::Pop,
     ];
-    run_program_assert_result(program, a);
+    run_program_assert_result(program, a.try_into().unwrap());
 }
 
 #[test]
