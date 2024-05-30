@@ -149,6 +149,60 @@ pub fn stack_push<'ctx>(
     Ok(())
 }
 
+// Returns a copy of the nth value of the stack
+pub fn get_nth_from_stack(
+    context: &'ctx MeliorContext,
+    block: &'ctx Block,
+    nth: usize,
+) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+    // Get address of stack pointer global
+    let stack_ptr_ptr = block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            STACK_PTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Load stack pointer
+    let stack_ptr = block
+        .append_operation(llvm::load(
+            context,
+            stack_ptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?;
+
+    // Decrement stack pointer
+    let old_stack_ptr = block
+        .append_operation(llvm::get_element_ptr(
+            context,
+            stack_ptr.into(),
+            DenseI32ArrayAttribute::new(context, &[-(nth - 1)]),
+            uint256.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    // Load value from top of stack
+    let value = block
+        .append_operation(llvm::load(
+            context,
+            old_stack_ptr.into(),
+            uint256.into(),
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?
+        .into();
+
+    Ok(value)
+}
+
 /// Generates code for checking if the stack has enough space for `element_count` more elements.
 pub fn check_stack_has_space_for<'ctx>(
     context: &'ctx MeliorContext,

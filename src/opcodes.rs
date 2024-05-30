@@ -54,6 +54,7 @@ pub enum Operation {
     Add,
     Sub,
     Push32([u8; 32]),
+    DupN(usize),
 }
 
 impl Operation {
@@ -74,7 +75,7 @@ impl Operation {
                     i += 31;
                     Operation::Push32(x)
                 }
-                Opcode::DUP1 => {}
+                Opcode::DUP1 => Operation::DupN(1),
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
