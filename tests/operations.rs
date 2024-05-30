@@ -94,14 +94,13 @@ fn push_push_normal_mul() {
 
 #[test]
 fn mul_wraps_result() {
-    let a = 128;
-    let b = 2;
+    let a = [0xFF; 32];
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push32(a),
+        Operation::Push32(new_32_byte_immediate(2)),
         Operation::Mul,
     ];
-    run_program_assert_result(program, 0);
+    run_program_assert_result(program, 254);
 }
 
 #[test]
