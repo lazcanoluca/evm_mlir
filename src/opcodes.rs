@@ -3,6 +3,7 @@ pub enum Opcode {
     ADD = 0x01,
     MUL = 0x02,
     PUSH32 = 0x7F,
+    POP = 0x50,
     UNUSED,
 }
 
@@ -12,6 +13,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::MUL as u8 => Opcode::MUL,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
+            x if x == Opcode::POP as u8 => Opcode::POP,
             _ => Opcode::UNUSED,
         }
     }
@@ -22,6 +24,7 @@ pub enum Operation {
     Add,
     Mul,
     Push32([u8; 32]),
+    Pop,
 }
 
 impl Operation {
@@ -42,6 +45,7 @@ impl Operation {
                     i += 31;
                     Operation::Push32(x)
                 }
+                Opcode::POP => Operation::Pop,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
