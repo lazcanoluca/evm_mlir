@@ -12,10 +12,6 @@ use crate::program::Program;
 pub(crate) struct OperationCtx<'c> {
     /// The MLIR context.
     pub mlir_context: &'c MeliorContext,
-    /// The MLIR module.
-    // pub mlir_module: &'c MeliorModule<'c>,
-    /// The compile session info.
-    // pub session: &'c Session,
     /// The program IR.
     pub program: &'c Program,
     /// Reference to the revert block.
