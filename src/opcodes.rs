@@ -201,7 +201,6 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH30 as u8 => Opcode::PUSH30,
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
-            x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::POP as u8 => Opcode::POP,
             _ => Opcode::UNUSED,
         }
