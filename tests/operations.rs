@@ -1,5 +1,5 @@
 use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
-use num_bigint::BigUint;
+use num_bigint::{BigUint, BigInt};
 use tempfile::NamedTempFile;
 
 fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
@@ -133,4 +133,46 @@ fn pop_with_stack_underflow() {
     // Pop with an empty stack
     let program = vec![Operation::Pop];
     run_program_assert_revert(program);
+}
+
+#[test]
+fn test_sgt_greater_than() {
+    let a = BigInt::from(-1);
+    let b = BigInt::from(9);
+
+    let program = vec![
+        Operation::Push(a),
+        Operation::Push(b),
+        Operation::Sgt,
+    ];
+
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_sgt_less_than() {
+    let a = BigInt::from(9);
+    let b = BigInt::from(-1);
+
+    let program = vec![
+        Operation::Push(a),
+        Operation::Push(b),
+        Operation::Sgt,
+    ];
+
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_sgt_equal() {
+    let a = BigUint::from(9);
+    let b = BigUint::from(9);
+
+    let program = vec![
+        Operation::Push(a),
+        Operation::Push(b),
+        Operation::Sgt,
+    ];
+
+    run_program_assert_result(program, 0);
 }
