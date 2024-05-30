@@ -1,4 +1,4 @@
-# EVM <-> MLIR
+# EVM MLIR
 
 [![Telegram Chat][tg-badge]][tg-url]
 [![rust](https://github.com/lambdaclass/evm_mlir/actions/workflows/ci.yml/badge.svg)](https://github.com/lambdaclass/emv_mlir/actions/workflows/ci.yml)
