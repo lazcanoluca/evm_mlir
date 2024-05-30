@@ -1,4 +1,4 @@
-# evm_mlir
+# EVM MLIR
 
 An EVM bytecode compiler written with MLIR.
 
