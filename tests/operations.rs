@@ -105,14 +105,14 @@ fn substraction_wraps_the_result() {
 
 fn sub_add_wrapping() {
     let a = [0xFF; 32];
-    let b = [10; 32]; 
+    let b = [10; 32];
 
     let program = vec![
         Operation::Push32(a),
         Operation::Push32(new_32_byte_immediate(10)),
         Operation::Add,
         Operation::Push32(new_32_byte_immediate(10)),
-        Operation::Sub
+        Operation::Sub,
     ];
 
     run_program_assert_result(program, 1);
