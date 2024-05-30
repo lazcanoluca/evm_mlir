@@ -122,3 +122,52 @@ fn sub_add_wrapping() {
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
 }
+
+#[test]
+fn push_push_normal_mul() {
+    let (a, b) = (2, 42);
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, a * b);
+}
+
+#[test]
+fn mul_wraps_result() {
+    let a = [0xFF; 32];
+    let program = vec![
+        Operation::Push32(a),
+        Operation::Push32(new_32_byte_immediate(2)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, 254);
+}
+
+#[test]
+fn mul_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mul]);
+}
+
+#[test]
+fn push_push_pop() {
+    // Push two values to the stack and then pop once
+    // The program result should be equal to the first
+    // pushed value
+    let (a, b) = (1, 2);
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Pop,
+    ];
+    run_program_assert_result(program, a);
+}
+
+#[test]
+fn pop_with_stack_underflow() {
+    // Pop with an empty stack
+    let program = vec![Operation::Pop];
+    run_program_assert_revert(program);
+}
