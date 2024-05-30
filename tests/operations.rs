@@ -112,7 +112,7 @@ fn sub_add_wrapping() {
         Operation::Push32(new_32_byte_immediate(10)),
         Operation::Add,
         Operation::Push32(new_32_byte_immediate(10)),
-        Operation::Sub
+        Operation::Sub,
     ];
 
     run_program_assert_result(program, 1);
