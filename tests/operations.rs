@@ -29,15 +29,11 @@ fn new_32_byte_immediate(value: u8) -> [u8; 32] {
     arr
 }
 
-fn new_32_byte_signed_immediate(value: i8) -> [u8; 32] {
-    let is_negative = (value >> 7) != 0;
+fn new_32_byte_by_lshift(byte_value: u8, byte_lshift: u8) -> [u8; 32] {
+    assert!(byte_lshift < 32);
     let mut arr = [0; 32];
-    arr[31] = value as u8;
-    if is_negative {
-        for i in 0..31 {
-            arr[i] = 0xFF
-        }
-    }
+    let idx = (31 - byte_lshift);
+    arr[idx as usize] = byte_value;
     arr
 }
 
@@ -109,16 +105,19 @@ fn div_without_remainder() {
 
 #[test]
 fn div_signed_division() {
-    // -20 in 8 bits two's complement is 236
-    let (a, b) = (-20, 2);
-
-    //236 / 2 = 118
-    let expected_result: u8 = 118;
+    // a = [1, 0, 0, 0, .... , 0, 0, 0, 0] == 1 << 255
+    let a = new_32_byte_by_lshift(0x80, 31);
+    // b = [0, 0, 1, 0, .... , 0, 0, 0, 0] == 1 << 253
+    let b = new_32_byte_by_lshift(0x20, 31);
+    //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
+    //If we take the lowest byte
+    //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
+    let expected_result: u8 = 4;
 
     let program = vec![
-        Operation::Push32(new_32_byte_signed_immediate(b)),
-        Operation::Push32(new_32_byte_signed_immediate(a)),
-        Operation::Div,
+        Operation::Push32(b), //
+        Operation::Push32(a), //
+        Operation::Div,       //
     ];
     run_program_assert_result(program, expected_result);
 }
