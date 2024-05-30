@@ -133,3 +133,14 @@ fn pop_with_stack_underflow() {
     let program = vec![Operation::Pop];
     run_program_assert_revert(program);
 }
+
+#[test]
+fn jumpdest() {
+    let expected = 5;
+    let program = vec![
+        Operation::Jumpdest { pc: 0 },
+        Operation::Push32(new_32_byte_immediate(expected)),
+        Operation::Jumpdest { pc: 34 },
+    ];
+    run_program_assert_result(program, expected)
+}

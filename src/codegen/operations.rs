@@ -113,7 +113,7 @@ fn codegen_add<'c, 'r>(
 }
 
 fn codegen_mul<'c, 'r>(
-    codegen_ctx: CodegenCtx<'c>,
+    codegen_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
@@ -124,7 +124,7 @@ fn codegen_mul<'c, 'r>(
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
     // Create REVERT block
-    let revert_block = region.append_block(revert_block(context)?);
+    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -152,7 +152,7 @@ fn codegen_mul<'c, 'r>(
 }
 
 fn codegen_pop<'c, 'r>(
-    codegen_ctx: CodegenCtx<'c>,
+    codegen_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
@@ -163,7 +163,7 @@ fn codegen_pop<'c, 'r>(
     let flag = check_stack_has_at_least(context, &start_block, 1)?;
 
     // Create REVERT block
-    let revert_block = region.append_block(revert_block(context)?);
+    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
