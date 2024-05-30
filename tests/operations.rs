@@ -1,13 +1,18 @@
-use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
+use evm_mlir::{
+    compile_binary,
+    constants::REVERT_EXIT_CODE,
+    program::{Operation, Program},
+};
 use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
-fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
+fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
+    let program = Program::from(operations);
     let output_file = NamedTempFile::new()
         .expect("failed to generate tempfile")
         .into_temp_path();
 
-    compile_binary(program, &output_file).expect("failed to compile program");
+    compile_binary(&program, &output_file).expect("failed to compile program");
 
     assert!(output_file.exists(), "output file does not exist");
 
@@ -133,4 +138,15 @@ fn pop_with_stack_underflow() {
     // Pop with an empty stack
     let program = vec![Operation::Pop];
     run_program_assert_revert(program);
+}
+
+#[test]
+fn jumpdest() {
+    let expected = 5;
+    let program = vec![
+        Operation::Jumpdest { pc: 0 },
+        Operation::Push(BigUint::from(expected)),
+        Operation::Jumpdest { pc: 34 },
+    ];
+    run_program_assert_result(program, expected)
 }
