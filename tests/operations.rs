@@ -100,3 +100,14 @@ fn pop_with_stack_underflow() {
     let program = vec![Operation::Pop];
     run_program_assert_revert(program);
 }
+
+#[test]
+fn push_push_exp() {
+    let (a, b) = (2, 2);
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Exp,
+    ];
+    run_program_assert_result(program, a.pow(b as u32));
+}

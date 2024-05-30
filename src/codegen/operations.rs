@@ -1,5 +1,5 @@
 use melior::{
-    dialect::{arith, cf},
+    dialect::{arith, cf,ods},
     ir::{Attribute, Block, BlockRef, Location, Region},
     Context as MeliorContext,
 };
@@ -24,7 +24,7 @@ pub fn generate_code_for_op<'c, 'r>(
     match op {
         Operation::Push32(x) => codegen_push(context, region, x),
         Operation::Add => codegen_add(context, region),
-        Operation::Exp => codgen_exp(context, region),
+        Operation::Exp => codegen_exp(context, region),
         Operation::Pop => codegen_pop(context, region),
     }
 }
@@ -58,7 +58,7 @@ fn codegen_exp<'c, 'r>(
     let lhs = stack_pop(context, &ok_block)?;
     let rhs = stack_pop(context, &ok_block)?;
 
-    
+    let result = ok_block.append_operation(ods::math::ipowi(context,rhs, lhs, location).into()).result(0)?.into();
 
     stack_push(context, &ok_block, result)?;
 
