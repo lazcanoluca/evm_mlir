@@ -9,7 +9,8 @@ use crate::{
     opcodes::Operation,
     utils::{
         check_denominator_is_zero, check_stack_has_at_least, check_stack_has_space_for,
-        integer_constant, revert_block, stack_pop, stack_push, u256_bytes_from_u32,
+        integer_constant_from_bytes, integer_constant_from_i64, revert_block, stack_pop,
+        stack_push,
     },
 };
 
@@ -58,7 +59,7 @@ fn codegen_push<'c, 'r>(
     let constant_value = ok_block
         .append_operation(arith::constant(
             context,
-            integer_constant(context, value_to_push),
+            integer_constant_from_bytes(context, value_to_push),
             location,
         ))
         .result(0)?
@@ -142,11 +143,10 @@ fn codegen_div<'c, 'r>(
     let den_not_zero_bloq = region.append_block(Block::new(&[]));
     let return_block = region.append_block(Block::new(&[]));
 
-    // Denominator is zero path
     let constant_value = den_zero_bloq
         .append_operation(arith::constant(
             context,
-            integer_constant(context, u256_bytes_from_u32(0u32)),
+            integer_constant_from_i64(context, 0i64).into(),
             location,
         ))
         .result(0)?

@@ -353,7 +353,7 @@ pub fn check_denominator_is_zero<'ctx>(
     let zero_constant_value = block
         .append_operation(arith::constant(
             context,
-            integer_constant(context, u256_bytes_from_u32(0u32)),
+            integer_constant_from_i64(context, 0i64).into(),
             location,
         ))
         .result(0)?
@@ -381,22 +381,15 @@ pub fn check_denominator_is_zero<'ctx>(
     Ok(flag.into())
 }
 
-//Returns a 32 bytes Big Endian slice
-pub fn u256_bytes_from_u32(x: u32) -> [u8; 32] {
-    let bytes = x.to_le_bytes();
-
-    let mut constant_value = [0u8; 32];
-    for (idx, byte) in bytes.iter().enumerate() {
-        let i = 31 - idx;
-        constant_value[i as usize] = *byte;
-    }
-    constant_value
-}
-
-pub fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
+pub fn integer_constant_from_bytes(context: &MeliorContext, value: [u8; 32]) -> Attribute {
     let str_value = BigUint::from_bytes_be(&value).to_string();
     // TODO: should we handle this error?
     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
+}
+
+pub fn integer_constant_from_i64(context: &MeliorContext, value: i64) -> IntegerAttribute {
+    let uint256 = IntegerType::new(context, 256);
+    IntegerAttribute::new(uint256.into(), value)
 }
 
 pub mod llvm_mlir {
