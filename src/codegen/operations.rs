@@ -1,7 +1,6 @@
 use melior::{
     dialect::{arith, cf},
     ir::{Attribute, Block, BlockRef, Location, Region},
-    Context as MeliorContext,
 };
 use num_bigint::BigUint;
 
@@ -22,18 +21,17 @@ pub fn generate_code_for_op<'c, 'r>(
     op: Operation,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     match op {
-        Operation::Push32(x) => codegen_push(context, region, x),
+        Operation::Push(x) => codegen_push(context, region, x),
         Operation::Add => codegen_add(context, region),
         Operation::Mul => codegen_mul(context, region),
         Operation::Pop => codegen_pop(context, region),
     }
 }
 
-// TODO: use const generics to generalize for pushN
 fn codegen_push<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
-    value_to_push: [u8; 32],
+    value_to_push: BigUint,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
@@ -57,12 +55,9 @@ fn codegen_push<'c, 'r>(
         location,
     ));
 
+    let constant_value = Attribute::parse(context, &format!("{} : i256", value_to_push)).unwrap();
     let constant_value = ok_block
-        .append_operation(arith::constant(
-            context,
-            integer_constant(context, value_to_push),
-            location,
-        ))
+        .append_operation(arith::constant(context, constant_value, location))
         .result(0)?
         .into();
 
@@ -178,10 +173,4 @@ fn codegen_pop<'c, 'r>(
     stack_pop(context, &ok_block)?;
 
     Ok((start_block, ok_block))
-}
-
-fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
-    let str_value = BigUint::from_bytes_be(&value).to_string();
-    // TODO: should we handle this error?
-    Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
 }
