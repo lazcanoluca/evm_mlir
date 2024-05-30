@@ -100,3 +100,36 @@ fn pop_with_stack_underflow() {
     let program = vec![Operation::Pop];
     run_program_assert_revert(program);
 }
+
+#[test]
+fn push_push_byte() {
+    let mut value: [u8; 32] = [0; 32];
+    let desired_byte = 0xff;
+    value[16] = desired_byte;
+    let offset = 16;
+    let program = vec![
+        Operation::Push32(value),
+        Operation::Push32(new_32_byte_immediate(offset)),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, desired_byte);
+}
+
+#[test]
+fn byte_with_stack_underflow() {
+    let program = vec![Operation::Byte];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn byte_with_offset_out_of_bounds() {
+    // must consider this case yet
+    let value: [u8; 32] = [0xff; 32];
+    let offset = 32;
+    let program = vec![
+        Operation::Push32(value),
+        Operation::Push32(new_32_byte_immediate(offset)),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, 0);
+}
