@@ -7,10 +7,12 @@ use melior::{
     ir::{
         attribute::{DenseI32ArrayAttribute, IntegerAttribute},
         r#type::IntegerType,
-        Block, Location, Value,
+        Attribute, Block, Location, Value,
     },
     Context as MeliorContext,
 };
+
+use num_bigint::BigUint;
 
 use crate::{
     constants::{MAX_STACK_SIZE, REVERT_EXIT_CODE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
@@ -338,6 +340,63 @@ pub fn revert_block(context: &MeliorContext) -> Result<Block, CodegenError> {
 
     revert_block.append_operation(func::r#return(&[exit_code.into()], location));
     Ok(revert_block)
+}
+
+pub fn check_denominator_is_zero<'ctx>(
+    context: &'ctx MeliorContext,
+    block: &'ctx Block,
+    denominator: &'ctx Value,
+) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+    let location = Location::unknown(context);
+
+    //Load zero value constant
+    let zero_constant_value = block
+        .append_operation(arith::constant(
+            context,
+            integer_constant(context, u256_bytes_from_u32(0u32)),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    //Perform the comparisson -> denominator == 0
+    let flag = block
+        .append_operation(
+            ods::llvm::icmp(
+                context,
+                IntegerType::new(context, 1).into(),
+                zero_constant_value,
+                *denominator,
+                IntegerAttribute::new(
+                    IntegerType::new(context, 64).into(),
+                    /* "eq" predicate enum value */ 0,
+                )
+                .into(),
+                location,
+            )
+            .into(),
+        )
+        .result(0)?;
+
+    Ok(flag.into())
+}
+
+//Returns a 32 bytes Big Endian slice
+pub fn u256_bytes_from_u32(x: u32) -> [u8; 32] {
+    let bytes = x.to_le_bytes();
+
+    let mut constant_value = [0u8; 32];
+    for (idx, byte) in bytes.iter().enumerate() {
+        let i = 31 - idx;
+        constant_value[i as usize] = *byte;
+    }
+    constant_value
+}
+
+pub fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
+    let str_value = BigUint::from_bytes_be(&value).to_string();
+    // TODO: should we handle this error?
+    Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
 }
 
 pub mod llvm_mlir {

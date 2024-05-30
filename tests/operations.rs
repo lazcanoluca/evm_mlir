@@ -32,7 +32,7 @@ fn new_32_byte_immediate(value: u8) -> [u8; 32] {
 fn new_32_byte_by_lshift(byte_value: u8, byte_lshift: u8) -> [u8; 32] {
     assert!(byte_lshift < 32);
     let mut arr = [0; 32];
-    let idx = (31 - byte_lshift);
+    let idx = 31 - byte_lshift;
     arr[idx as usize] = byte_value;
     arr
 }
@@ -136,7 +136,6 @@ fn div_with_remainder() {
     run_program_assert_result(program, expected_result);
 }
 
-#[ignore]
 #[test]
 fn div_with_zero_denominator() {
     let (a, b) = (5, 0);

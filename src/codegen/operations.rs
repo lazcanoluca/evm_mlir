@@ -1,16 +1,15 @@
 use melior::{
     dialect::{arith, cf},
-    ir::{Attribute, Block, BlockRef, Location, Region},
-    Context as MeliorContext,
+    ir::{Block, BlockRef, Location, Region},
 };
-use num_bigint::BigUint;
 
 use super::context::CodegenCtx;
 use crate::{
     errors::CodegenError,
     opcodes::Operation,
     utils::{
-        check_stack_has_at_least, check_stack_has_space_for, revert_block, stack_pop, stack_push,
+        check_denominator_is_zero, check_stack_has_at_least, check_stack_has_space_for,
+        integer_constant, revert_block, stack_pop, stack_push, u256_bytes_from_u32,
     },
 };
 
@@ -135,21 +134,47 @@ fn codegen_div<'c, 'r>(
         location,
     ));
 
-    let lhs = stack_pop(context, &ok_block)?;
-    let rhs = stack_pop(context, &ok_block)?;
+    let num = stack_pop(context, &ok_block)?;
+    let den = stack_pop(context, &ok_block)?;
 
-    let result = ok_block
-        .append_operation(arith::divui(lhs, rhs, location))
+    let den_is_zero = check_denominator_is_zero(context, &ok_block, &den)?;
+    let den_zero_bloq = region.append_block(Block::new(&[]));
+    let den_not_zero_bloq = region.append_block(Block::new(&[]));
+    let return_block = region.append_block(Block::new(&[]));
+
+    // Denominator is zero path
+    let constant_value = den_zero_bloq
+        .append_operation(arith::constant(
+            context,
+            integer_constant(context, u256_bytes_from_u32(0u32)),
+            location,
+        ))
         .result(0)?
         .into();
 
-    stack_push(context, &ok_block, result)?;
+    stack_push(context, &den_zero_bloq, constant_value)?;
 
-    Ok((start_block, ok_block))
-}
+    den_zero_bloq.append_operation(cf::br(&return_block, &[], location));
 
-fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
-    let str_value = BigUint::from_bytes_be(&value).to_string();
-    // TODO: should we handle this error?
-    Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
+    // Denominator is not zero path
+    let result = den_not_zero_bloq
+        .append_operation(arith::divui(num, den, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_not_zero_bloq, result)?;
+
+    den_not_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    ok_block.append_operation(cf::cond_br(
+        context,
+        den_is_zero,
+        &den_zero_bloq,
+        &den_not_zero_bloq,
+        &[],
+        &[],
+        location,
+    ));
+
+    Ok((start_block, return_block))
 }
