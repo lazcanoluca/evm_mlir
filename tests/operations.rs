@@ -234,3 +234,40 @@ fn jumpdest() {
     ];
     run_program_assert_result(program, expected)
 }
+
+fn push_push_push_addmod() {
+    let (a, b, n) = (
+        BigUint::from(11_u8),
+        BigUint::from(31_u8),
+        BigUint::from(10_u8),
+    );
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Push(n.clone()),
+        Operation::Add,
+    ];
+    run_program_assert_result(program, ((a + b) % n).try_into().unwrap());
+}
+
+#[test]
+fn addmod_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Addmod]);
+}
+
+#[test]
+fn addmod_with_mod_zero() {
+    let (a, b, n) = (
+        BigUint::from(11_u8),
+        BigUint::from(31_u8),
+        BigUint::from(10_u8),
+    );
+
+    run_program_assert_revert(vec![
+        Operation::Push(a),
+        Operation::Push(b),
+        Operation::Push(n),
+        Operation::Addmod,
+    ]);
+}
