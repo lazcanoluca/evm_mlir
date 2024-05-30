@@ -145,6 +145,7 @@ fn codegen_byte<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
@@ -156,6 +157,15 @@ fn codegen_byte<'c, 'r>(
     let revert_block = region.append_block(revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
+
+    // in out_of_bounds_block a 0 is pushed to the stack
+    let out_of_bounds_block = region.append_block(Block::new(&[]));
+
+    // in offset_ok_block the byte operation is performed
+    let offset_ok_block = region.append_block(Block::new(&[]));
+
+    let end_block = region.append_block(Block::new(&[]));
+
 
     start_block.append_operation(cf::cond_br(
         context,
@@ -169,26 +179,6 @@ fn codegen_byte<'c, 'r>(
 
     let offset = stack_pop(context, &ok_block)?;
     let value = stack_pop(context, &ok_block)?;
-
-    // the idea is to use left and right shifts in order to extract the
-    // desired byte from the value, removing the rest of the bytes
-    //
-    // for example, if we want to extract the 0xFF byte in the following value
-    // (for simplicity the value has fewer bytes than it has in reality)
-    //
-    // value = 0xAABBCCDDFFAABBCC
-    //                   ^^
-    //              desired byte
-    //
-    // we can shift the value to the left to remove the left-side bytes that
-    // we don't care about
-    //
-    // value = 0xAABBCCDDFFAABBCC -> 0xFFAABBCC00000000
-    //                   ^^            ^^
-    // and then shift it to the right to remove the right-side bytes
-    //
-    // value = 0xFFAABBCC00000000 -> 0x00000000000000FF
-    //           ^^                                  ^^
 
     // define the relevant constants
     const BITS_PER_BYTE: u8 = 8;
@@ -216,20 +206,86 @@ fn codegen_byte<'c, 'r>(
         ))
         .result(0)?
         .into();
+    
+    // compare  offset > max_shift?
+    let is_offset_out_of_bounds = ok_block
+        .append_operation(
+            arith::cmpi(
+                context,
+                arith::CmpiPredicate::Ugt,
+                offset,
+                constant_max_shift,
+                location,
+            )
+            .into(),
+        )
+        .result(0)?
+        .into();
+    
+    // if offset > max_shift => branch to out_of_bounds_block
+    ok_block.append_operation(cf::cond_br(
+        context,
+        is_offset_out_of_bounds,
+        &out_of_bounds_block,
+        &offset_ok_block,
+        &[],
+        &[],
+        location,
+    ));
 
-    // compute how many bits the value must be shifted to the left
+
+    let zero = out_of_bounds_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant(context, [0; 32]),
+            location,
+        ))
+        .result(0)?
+        .into();
+    
+    // push zero to the stack
+    stack_push(context, &out_of_bounds_block, zero)?;
+
+    out_of_bounds_block.append_operation(cf::br(
+        &end_block,
+        &[],
+        location
+    ));
+
+
+    // the idea is to use left and right shifts in order to extract the
+    // desired byte from the value, removing the rest of the bytes
+    //
+    // for example, if we want to extract the 0xFF byte in the following value
+    // (for simplicity the value has fewer bytes than it has in reality)
+    //
+    // value = 0xAABBCCDDFFAABBCC
+    //                   ^^
+    //              desired byte
+    //
+    // we can shift the value to the left to remove the left-side bytes that
+    // we don't care about
+    //
+    // value = 0xAABBCCDDFFAABBCC -> 0xFFAABBCC00000000
+    //                   ^^            ^^
+    // and then shift it to the right to remove the right-side bytes
+    //
+    // value = 0xFFAABBCC00000000 -> 0x00000000000000FF
+    //           ^^                                  ^^
+
+    // in case the offset is ok, compute how many bits the value must be shifted to the left
     // shift_left = offset * bits_per_byte = offset * 8
-    let shift_left = ok_block
+    let shift_left = offset_ok_block
         .append_operation(arith::muli(offset, constant_bits_per_byte, location))
         .result(0)?
         .into();
 
-    let shifted_left_value = ok_block
+    let shifted_left_value = offset_ok_block
         .append_operation(arith::shli(value, shift_left, location))
         .result(0)?
         .into();
 
-    let result = ok_block
+    let result = offset_ok_block
         .append_operation(arith::shrui(
             shifted_left_value,
             constant_max_shift,
@@ -237,9 +293,16 @@ fn codegen_byte<'c, 'r>(
         ))
         .result(0)?
         .into();
+    
+    stack_push(context, &offset_ok_block, result)?;
+    
+    offset_ok_block.append_operation(cf::br(
+        &end_block,
+        &[],
+        location
+    ));
 
-    stack_push(context, &ok_block, result)?;
-    Ok((start_block, ok_block))
+    Ok((start_block, end_block))
 }
 
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
