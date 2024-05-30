@@ -29,8 +29,7 @@ fn push_once() {
     let value = BigUint::from(5_u8);
 
     // For PUSH0
-    let shifted_value = BigUint::ZERO << (32 * 8);
-    let program = vec![Operation::Push(shifted_value)];
+    let program = vec![Operation::Push(BigUint::ZERO)];
     run_program_assert_result(program, 0);
 
     // For PUSH1, ... , PUSH32

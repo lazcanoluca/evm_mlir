@@ -227,14 +227,10 @@ impl Operation {
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
                 Opcode::MUL => Operation::Mul,
-                Opcode::PUSH0 => {
-                    i += 32;
-                    Operation::Push(BigUint::ZERO)
-                }
+                Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
                     i += 1;
                     let x = bytecode[i..(i + 1)].try_into().unwrap();
-                    i += 31;
                     Operation::Push(BigUint::from_bytes_be(x))
                 }
                 Opcode::PUSH2 => {
