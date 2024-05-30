@@ -223,7 +223,7 @@ fn codegen_byte<'c, 'r>(
                 context,
                 arith::CmpiPredicate::Ugt,
                 offset,
-                constant_max_shift_in_bits,
+                constant_max_shift_in_bytes,
                 location,
             )
             .into(),
