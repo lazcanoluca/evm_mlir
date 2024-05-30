@@ -81,6 +81,7 @@ fn codegen_dup<'c, 'r>(
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
 
+    //TODO check nth is not 0
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, nth)?;
 
@@ -100,7 +101,6 @@ fn codegen_dup<'c, 'r>(
     ));
 
     let nth_value = get_nth_from_stack(context, &ok_block, nth)?;
-    //let nth_value = stack_pop(context, &ok_block)?;
 
     stack_push(context, &ok_block, nth_value)?;
 
