@@ -137,38 +137,30 @@ fn pop_with_stack_underflow() {
 
 #[test]
 fn push_push_exp() {
-    let (a, b) = (2, 3);
+    let (a, b) = (BigUint::from(2_u8), BigUint::from(3_u8));
+
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Exp,
     ];
-    run_program_assert_result(program, a.pow(b as u32));
-}
 
-#[test]
-fn exp_with_negative_exponent() {
-    let (a, b) = (2, -3);
-    let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b as u8)),
-        Operation::Exp,
-    ];
-    run_program_assert_result(program, 0);
+    run_program_assert_result(program, (a.pow(b.try_into().unwrap())).try_into().unwrap());
 }
-
 
 #[test]
 fn exp_with_should_wrap() {
-    let a = [0x100; 32];
+    let a = BigUint::from(2_u8);
+    let b = BigUint::from(256_u16);
+
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(2)),
-        Operation::Push32(a),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Exp,
     ];
+
     run_program_assert_result(program, 0);
 }
-
 
 #[test]
 fn exp_with_stack_underflow() {
