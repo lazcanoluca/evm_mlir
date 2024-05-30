@@ -1,7 +1,6 @@
 use melior::{
     dialect::{arith, cf},
     ir::{Attribute, Block, BlockRef, Location, Region},
-    Context as MeliorContext,
 };
 use num_bigint::BigUint;
 
@@ -23,18 +22,19 @@ pub fn generate_code_for_op<'c, 'r>(
     op: Operation,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     match op {
-        Operation::Push32(x) => codegen_push(context, region, x),
-        Operation::DupN(x) => codegen_dup(context, region, x),
-        Operation::Add => codegen_add(context, region),
+        Operation::Dup(x) => codegen_dup(context, region, x),
         Operation::Sub => codegen_sub(context, region),
+        Operation::Push(x) => codegen_push(context, region, x),
+        Operation::Add => codegen_add(context, region),
+        Operation::Mul => codegen_mul(context, region),
+        Operation::Pop => codegen_pop(context, region),
     }
 }
 
-// TODO: use const generics to generalize for pushN
 fn codegen_push<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
-    value_to_push: [u8; 32],
+    value_to_push: BigUint,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
@@ -58,12 +58,9 @@ fn codegen_push<'c, 'r>(
         location,
     ));
 
+    let constant_value = Attribute::parse(context, &format!("{} : i256", value_to_push)).unwrap();
     let constant_value = ok_block
-        .append_operation(arith::constant(
-            context,
-            integer_constant(context, value_to_push),
-            location,
-        ))
+        .append_operation(arith::constant(context, constant_value, location))
         .result(0)?
         .into();
 
@@ -183,8 +180,77 @@ fn codegen_sub<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
+fn codegen_mul<'c, 'r>(
+    codegen_ctx: CodegenCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &codegen_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::muli(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
 fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
     let str_value = BigUint::from_bytes_be(&value).to_string();
     // TODO: should we handle this error?
     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
+
+fn codegen_pop<'c, 'r>(
+    codegen_ctx: CodegenCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &codegen_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's at least 1 element in stack
+    let flag = check_stack_has_at_least(context, &start_block, 1)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    stack_pop(context, &ok_block)?;
+
+    Ok((start_block, ok_block))
 }
