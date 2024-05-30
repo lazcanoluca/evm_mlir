@@ -77,6 +77,28 @@ fn push_push_add() {
 }
 
 #[test]
+fn dup1_once() {
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(10)),
+        Operation::Push32(new_32_byte_immediate(32)),
+        Operation::DupN(1),
+    ];
+
+    run_program_assert_result(program, 32);
+}
+
+#[test]
+fn dup2_once() {
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(4)),
+        Operation::Push32(new_32_byte_immediate(5)),
+        Operation::DupN(2),
+    ];
+
+    run_program_assert_result(program, 4);
+}
+
+#[test]
 fn push_push_sub() {
     let (a, b) = (11, 31);
 
@@ -86,17 +108,6 @@ fn push_push_sub() {
         Operation::Sub,
     ];
     run_program_assert_result(program, b - a);
-}
-
-#[test]
-fn dup_once() {
-    let program = vec![
-        Operation::Push32(new_32_byte_immediate(10)),
-        Operation::Push32(new_32_byte_immediate(32)),
-        Operation::DupN(1),
-    ];
-
-    run_program_assert_result(program, 32);
 }
 
 #[test]

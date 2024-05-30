@@ -5,7 +5,7 @@ pub enum Opcode {
     PUSH32 = 0x7F,
     DUP1 = 0x80,
     DUP2 = 0x81,
-    /*DUP3 = 0x82,
+    DUP3 = 0x82,
     DUP4 = 0x83,
     DUP5 = 0x84,
     DUP6 = 0x85,
@@ -18,7 +18,7 @@ pub enum Opcode {
     DUP13 = 0x8C,
     DUP14 = 0x8D,
     DUP15 = 0x8E,
-    DUP16 = 0x8F,*/
+    DUP16 = 0x8F,
     UNUSED,
 }
 
@@ -30,7 +30,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::DUP1 as u8 => Opcode::DUP1,
             x if x == Opcode::DUP2 as u8 => Opcode::DUP2,
-            /*x if x == Opcode::DUP3 as u8 => Opcode::DUP3,
+            x if x == Opcode::DUP3 as u8 => Opcode::DUP3,
             x if x == Opcode::DUP4 as u8 => Opcode::DUP4,
             x if x == Opcode::DUP5 as u8 => Opcode::DUP5,
             x if x == Opcode::DUP6 as u8 => Opcode::DUP6,
@@ -43,7 +43,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::DUP13 as u8 => Opcode::DUP13,
             x if x == Opcode::DUP14 as u8 => Opcode::DUP14,
             x if x == Opcode::DUP15 as u8 => Opcode::DUP15,
-            x if x == Opcode::DUP16 as u8 => Opcode::DUP16,*/
+            x if x == Opcode::DUP16 as u8 => Opcode::DUP16,
             _ => Opcode::UNUSED,
         }
     }
@@ -77,6 +77,20 @@ impl Operation {
                 }
                 Opcode::DUP1 => Operation::DupN(1),
                 Opcode::DUP2 => Operation::DupN(2),
+                Opcode::DUP3 => Operation::DupN(3),
+                Opcode::DUP4 => Operation::DupN(4),
+                Opcode::DUP5 => Operation::DupN(5),
+                Opcode::DUP6 => Operation::DupN(6),
+                Opcode::DUP7 => Operation::DupN(7),
+                Opcode::DUP8 => Operation::DupN(8),
+                Opcode::DUP9 => Operation::DupN(9),
+                Opcode::DUP10 => Operation::DupN(10),
+                Opcode::DUP11 => Operation::DupN(11),
+                Opcode::DUP12 => Operation::DupN(12),
+                Opcode::DUP13 => Operation::DupN(13),
+                Opcode::DUP14 => Operation::DupN(14),
+                Opcode::DUP15 => Operation::DupN(15),
+                Opcode::DUP16 => Operation::DupN(16),
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
