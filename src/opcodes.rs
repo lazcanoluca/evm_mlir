@@ -20,7 +20,7 @@ pub enum Opcode {
     // LT = 0x10,
     // GT = 0x11,
     // SLT = 0x12,
-    // SGT = 0x13,
+    SGT = 0x13,
     // EQ = 0x14,
     // ISZERO = 0x15,
     // AND = 0x16,
@@ -211,6 +211,7 @@ impl From<u8> for Opcode {
 pub enum Operation {
     Add,
     Mul,
+    Sgt,
     Push(BigUint),
     Pop,
 }
@@ -227,6 +228,7 @@ impl Operation {
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
                 Opcode::MUL => Operation::Mul,
+                Opcode::SGT => Operation::Sgt,
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
                     i += 1;
