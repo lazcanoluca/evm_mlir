@@ -186,8 +186,8 @@ fn codegen_byte<'c, 'r>(
 
     let mut max_shift: [u8; 32] = [0; 32];
     max_shift[31] = MAX_SHIFT * BITS_PER_BYTE;
-    let mut max_shift_in_bits: [u8; 32] = [0; 32];
-    max_shift_in_bits[31] = MAX_SHIFT;
+    let mut max_shift_in_bytes: [u8; 32] = [0; 32];
+    max_shift_in_bytes[31] = MAX_SHIFT;
 
     let constant_bits_per_byte = ok_block
         .append_operation(arith::constant(
@@ -207,10 +207,10 @@ fn codegen_byte<'c, 'r>(
         .result(0)?
         .into();
 
-    let constant_max_shift_in_bits = ok_block
+    let constant_max_shift_in_bytes = ok_block
         .append_operation(arith::constant(
             context,
-            integer_constant(context, max_shift_in_bits),
+            integer_constant(context, max_shift_in_bytes),
             location,
         ))
         .result(0)?
