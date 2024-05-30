@@ -44,7 +44,6 @@ fn push_once() {
 #[test]
 fn push_twice() {
     let the_answer = BigUint::from(42_u8);
-
     let program = vec![
         Operation::Push(BigUint::from(1_u8)),
         Operation::Push(the_answer.clone()),
@@ -55,14 +54,13 @@ fn push_twice() {
 #[test]
 fn push_fill_stack() {
     let stack_top = BigUint::from(88_u8);
-
     // Push 1024 times
     let program = vec![Operation::Push(stack_top.clone()); 1024];
     run_program_assert_result(program, stack_top.try_into().unwrap());
 }
 
 #[test]
-fn push_stack_overflow() {
+fn push32_stack_overflow() {
     // Push 1025 times
     let program = vec![Operation::Push(BigUint::from(88_u8)); 1025];
     run_program_assert_revert(program);
@@ -83,125 +81,86 @@ fn push_push_add() {
 #[test]
 fn dup1_once() {
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(10)),
-        Operation::Push32(new_32_byte_immediate(32)),
-        Operation::DupN(1),
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Push(BigUint::from(31_u8)),
+        Operation::Dup(1),
+        Operation::Pop,
     ];
 
-    run_program_assert_result(program, 32);
+    run_program_assert_result(program, 31);
 }
 
 #[test]
 fn dup2_once() {
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(4)),
-        Operation::Push32(new_32_byte_immediate(5)),
-        Operation::DupN(2),
+        Operation::Push(BigUint::from(4_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Push(BigUint::from(6_u8)),
+        Operation::Dup(2),
     ];
 
-    run_program_assert_result(program, 4);
+    run_program_assert_result(program, 5);
 }
 
 #[test]
-fn push_push_sub() {
-    let (a, b) = (11, 31);
-
+fn dup_combined() {
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
-        Operation::Sub,
+        Operation::Push(BigUint::from(4_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Push(BigUint::from(6_u8)),
+        Operation::Dup(2),
+        Operation::Dup(1),
+        Operation::Dup(5),
+        Operation::Dup(3),
+        Operation::Dup(4),
+        Operation::Dup(7),
+        Operation::Dup(6),
+        Operation::Dup(8),
+        Operation::Dup(9),
+        Operation::Dup(12),
+        Operation::Dup(11),
+        Operation::Dup(10),
+        Operation::Dup(13),
+        Operation::Dup(15),
+        Operation::Dup(14),
+        Operation::Dup(16),
     ];
-    run_program_assert_result(program, b - a);
+
+    run_program_assert_result(program, 6);
 }
 
 #[test]
 fn dup_with_stack_underflow() {
-    let program = vec![Operation::DupN(1)];
+    let program = vec![Operation::Dup(1)];
     run_program_assert_revert(program);
 }
 
 #[test]
-fn substraction_wraps_the_result() {
-    let (a, b) = (10, 0);
+fn push_push_sub() {
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Sub,
     ];
-
-    let result = ((b as u32).wrapping_sub(a as u32)) as u8;
-
-    run_program_assert_result(program, result);
+    run_program_assert_result(program, 20);
 }
 
 #[test]
-fn sub_add_wrapping() {
-    let a = [0xFF; 32];
-    let b = [10; 32];
+fn substraction_wraps_the_result() {
+    let (a, b) = (BigUint::from(10_u8), BigUint::from(0_u8));
 
     let program = vec![
-        Operation::Push32(a),
-        Operation::Push32(new_32_byte_immediate(10)),
-        Operation::Add,
-        Operation::Push32(new_32_byte_immediate(10)),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Sub,
     ];
 
-    run_program_assert_result(program, 1);
+    run_program_assert_result(program, 246);
 }
 
 #[test]
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
-}
-
-#[test]
-fn push_push_normal_mul() {
-    let (a, b) = (BigUint::from(2_u8), BigUint::from(42_u8));
-
-    let program = vec![
-        Operation::Push(a.clone()),
-        Operation::Push(b.clone()),
-        Operation::Mul,
-    ];
-    run_program_assert_result(program, (a * b).try_into().unwrap());
-}
-
-#[test]
-fn mul_wraps_result() {
-    let a = BigUint::from_bytes_be(&[0xFF; 32]);
-    let program = vec![
-        Operation::Push(a.clone()),
-        Operation::Push(BigUint::from(2_u8)),
-        Operation::Mul,
-    ];
-    run_program_assert_result(program, 254);
-}
-
-#[test]
-fn mul_with_stack_underflow() {
-    run_program_assert_revert(vec![Operation::Mul]);
-}
-
-#[test]
-fn push_push_pop() {
-    // Push two values to the stack and then pop once
-    // The program result should be equal to the first
-    // pushed value
-    let (a, b) = (BigUint::from(1_u8), BigUint::from(2_u8));
-
-    let program = vec![
-        Operation::Push(a.clone()),
-        Operation::Push(b),
-        Operation::Pop,
-    ];
-    run_program_assert_result(program, a.try_into().unwrap());
-}
-
-#[test]
-fn pop_with_stack_underflow() {
-    // Pop with an empty stack
-    let program = vec![Operation::Pop];
-    run_program_assert_revert(program);
 }

@@ -78,7 +78,7 @@ fn codegen_dup<'c, 'r>(
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
 
-    //TODO check nth is not 0
+    //TODO check nth is not 0≈
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, nth)?;
 
@@ -98,6 +98,8 @@ fn codegen_dup<'c, 'r>(
     ));
 
     let nth_value = get_nth_from_stack(context, &ok_block, nth)?;
+
+    stack_push(context, &ok_block, nth_value)?;
 
     Ok((start_block, ok_block))
 }
@@ -218,11 +220,6 @@ fn codegen_mul<'c, 'r>(
 
     Ok((start_block, ok_block))
 }
-
-fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
-    let str_value = BigUint::from_bytes_be(&value).to_string();
-    // TODO: should we handle this error?
-    Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
 
 fn codegen_pop<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,

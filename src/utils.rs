@@ -155,6 +155,7 @@ pub fn get_nth_from_stack<'ctx>(
     block: &'ctx Block,
     nth: u32,
 ) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+    debug_assert!(nth < MAX_STACK_SIZE as u32);
     let uint256 = IntegerType::new(context, 256);
     let location = Location::unknown(context);
     let ptr_type = pointer(context, 0);
@@ -185,7 +186,7 @@ pub fn get_nth_from_stack<'ctx>(
         .append_operation(llvm::get_element_ptr(
             context,
             stack_ptr.into(),
-            DenseI32ArrayAttribute::new(context, &[-(nth as i32 - 1)]),
+            DenseI32ArrayAttribute::new(context, &[-(nth as i32)]),
             uint256.into(),
             ptr_type,
             location,
