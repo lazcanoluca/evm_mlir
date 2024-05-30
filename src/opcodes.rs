@@ -4,8 +4,8 @@ pub enum Opcode {
     SUB = 0x03,
     PUSH32 = 0x7F,
     DUP1 = 0x80,
-    /*DUP2 = 0x81,
-    DUP3 = 0x82,
+    DUP2 = 0x81,
+    /*DUP3 = 0x82,
     DUP4 = 0x83,
     DUP5 = 0x84,
     DUP6 = 0x85,
@@ -29,8 +29,8 @@ impl From<u8> for Opcode {
             x if x == Opcode::SUB as u8 => Opcode::SUB,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::DUP1 as u8 => Opcode::DUP1,
-            /*x if x == Opcode::DUP2 as u8 => Opcode::DUP2,
-            x if x == Opcode::DUP3 as u8 => Opcode::DUP3,
+            x if x == Opcode::DUP2 as u8 => Opcode::DUP2,
+            /*x if x == Opcode::DUP3 as u8 => Opcode::DUP3,
             x if x == Opcode::DUP4 as u8 => Opcode::DUP4,
             x if x == Opcode::DUP5 as u8 => Opcode::DUP5,
             x if x == Opcode::DUP6 as u8 => Opcode::DUP6,
@@ -76,6 +76,7 @@ impl Operation {
                     Operation::Push32(x)
                 }
                 Opcode::DUP1 => Operation::DupN(1),
+                Opcode::DUP2 => Operation::DupN(2),
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);

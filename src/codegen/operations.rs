@@ -102,8 +102,6 @@ fn codegen_dup<'c, 'r>(
 
     let nth_value = get_nth_from_stack(context, &ok_block, nth)?;
 
-    stack_push(context, &ok_block, nth_value)?;
-
     Ok((start_block, ok_block))
 }
 

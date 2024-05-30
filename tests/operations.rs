@@ -91,6 +91,7 @@ fn push_push_sub() {
 #[test]
 fn dup_once() {
     let program = vec![
+        Operation::Push32(new_32_byte_immediate(10)),
         Operation::Push32(new_32_byte_immediate(32)),
         Operation::DupN(1),
     ];
