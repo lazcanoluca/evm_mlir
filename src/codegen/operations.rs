@@ -190,7 +190,7 @@ fn codegen_jumpdest<'c>(
     let landing_block = region.append_block(Block::new(&[]));
 
     // Register jumpdest block in context
-    op_ctx.jumpdest_blocks.insert(pc, landing_block);
+    op_ctx.register_jump_destination(pc, landing_block);
 
     Ok((landing_block, landing_block))
 }

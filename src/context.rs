@@ -334,12 +334,16 @@ fn generate_stack_setup_block<'c>(
     Ok(block)
 }
 
+/// Create the jumptable landing block. This is the main entrypoint
+/// for JUMP and JUMPI operations.
 fn create_jumptable_landing_block(context: &MeliorContext) -> Block {
     let location = Location::unknown(context);
     let uint256 = IntegerType::new(context, 256);
     Block::new(&[(uint256.into(), location)])
 }
 
+/// Populate the jumptable block with a dynamic dispatch according to the
+/// received PC.
 fn populate_jumptable(op_ctx: &OperationCtx) -> Result<(), CodegenError> {
     let context = op_ctx.mlir_context;
     let program = op_ctx.program;
