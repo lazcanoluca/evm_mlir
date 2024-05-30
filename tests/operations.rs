@@ -1,4 +1,5 @@
 use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
+use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
 fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
@@ -85,6 +86,21 @@ fn push_push_sub() {
         Operation::Sub,
     ];
     run_program_assert_result(program, b - a);
+}
+
+#[test]
+fn substraction_wraps_the_result() {
+    let (a, b) = (10, 0); 
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Sub,
+    ];
+
+    let result = ((b as u32).wrapping_sub(a as u32)) as u8;
+
+    run_program_assert_result(program, result);
 }
 
 #[test]
