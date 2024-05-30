@@ -1,5 +1,4 @@
 use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
-use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
 fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
