@@ -89,6 +89,22 @@ fn push_push_sub() {
 }
 
 #[test]
+fn dup_once() {
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(32)),
+        Operation::DupN(1),
+    ];
+
+    run_program_assert_result(program, 32);
+}
+
+#[test]
+fn dup_with_stack_underflow() {
+    let program = vec![Operation::DupN(1)];
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn substraction_wraps_the_result() {
     let (a, b) = (10, 0);
 
@@ -103,6 +119,7 @@ fn substraction_wraps_the_result() {
     run_program_assert_result(program, result);
 }
 
+#[test]
 fn sub_add_wrapping() {
     let a = [0xFF; 32];
     let b = [10; 32];

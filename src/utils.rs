@@ -150,11 +150,15 @@ pub fn stack_push<'ctx>(
 }
 
 // Returns a copy of the nth value of the stack
-pub fn get_nth_from_stack(
+pub fn get_nth_from_stack<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
-    nth: usize,
+    nth: u32,
 ) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+    let uint256 = IntegerType::new(context, 256);
+    let location = Location::unknown(context);
+    let ptr_type = pointer(context, 0);
+
     // Get address of stack pointer global
     let stack_ptr_ptr = block
         .append_operation(llvm_mlir::addressof(
@@ -181,7 +185,7 @@ pub fn get_nth_from_stack(
         .append_operation(llvm::get_element_ptr(
             context,
             stack_ptr.into(),
-            DenseI32ArrayAttribute::new(context, &[-(nth - 1)]),
+            DenseI32ArrayAttribute::new(context, &[-(nth as i32 - 1)]),
             uint256.into(),
             ptr_type,
             location,

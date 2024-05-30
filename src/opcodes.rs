@@ -54,7 +54,7 @@ pub enum Operation {
     Add,
     Sub,
     Push32([u8; 32]),
-    DupN(usize),
+    DupN(u32),
 }
 
 impl Operation {

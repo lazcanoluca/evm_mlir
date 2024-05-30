@@ -72,17 +72,17 @@ fn codegen_push<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
-fn codegen_dup<'c, 'r, const N: usize>(
+fn codegen_dup<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
-    index: N,
+    nth: u32,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
 
     // Check there's enough elements in stack
-    let flag = check_stack_has_at_least(context, &start_block, index)?;
+    let flag = check_stack_has_at_least(context, &start_block, nth)?;
 
     // Create REVERT block
     let revert_block = region.append_block(revert_block(context)?);
@@ -99,9 +99,10 @@ fn codegen_dup<'c, 'r, const N: usize>(
         location,
     ));
 
-    let nth_value = get_nth_from_stack(context, block, index);
+    let nth_value = get_nth_from_stack(context, &ok_block, nth)?;
+    //let nth_value = stack_pop(context, &ok_block)?;
 
-    stack_push(context, block, nth_value);
+    stack_push(context, &ok_block, nth_value)?;
 
     Ok((start_block, ok_block))
 }
