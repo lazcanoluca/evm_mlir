@@ -29,13 +29,6 @@ fn new_32_byte_immediate(value: u8) -> [u8; 32] {
     arr
 }
 
-fn new_32_byte_immediate_u16(value: u16) -> [u8; 32] {
-    let mut arr = [0; 32];
-    arr[30] = (value >> 8) as u8;
-    arr[31] = (value & 0xFF) as u8;
-    arr
-}
-
 #[test]
 fn push32_once() {
     let the_answer = 42;
@@ -100,16 +93,15 @@ fn push_push_normal_mul() {
 }
 
 #[test]
-fn mul_with_overflow() {
-    let (a, b) = (255 as u16, 255 as u16);
-
+fn mul_wraps_result() {
+    let a = 128;
+    let b = 2;
     let program = vec![
-        Operation::Push32(new_32_byte_immediate_u16(a)),
-        Operation::Push32(new_32_byte_immediate_u16(b)),
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
         Operation::Mul,
     ];
-
-    run_program_assert_result(program, (a * b) as u8);
+    run_program_assert_result(program, 0);
 }
 
 #[test]
