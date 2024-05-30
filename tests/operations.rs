@@ -137,11 +137,41 @@ fn pop_with_stack_underflow() {
 
 #[test]
 fn push_push_exp() {
-    let (a, b) = (2, 2);
+    let (a, b) = (2, 3);
     let program = vec![
         Operation::Push32(new_32_byte_immediate(a)),
         Operation::Push32(new_32_byte_immediate(b)),
         Operation::Exp,
     ];
     run_program_assert_result(program, a.pow(b as u32));
+}
+
+#[test]
+fn exp_with_negative_exponent() {
+    let (a, b) = (2, -3);
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b as u8)),
+        Operation::Exp,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+
+#[test]
+fn exp_with_should_wrap() {
+    let a = [0x100; 32];
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(2)),
+        Operation::Push32(a),
+        Operation::Exp,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+
+#[test]
+fn exp_with_stack_underflow() {
+    let program = vec![Operation::Exp];
+    run_program_assert_revert(program);
 }
