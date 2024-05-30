@@ -81,6 +81,34 @@ fn add_with_stack_underflow() {
 }
 
 #[test]
+fn push_push_normal_mul() {
+    let (a, b) = (2, 42);
+
+    let program = vec![
+        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, a * b);
+}
+
+#[test]
+fn mul_wraps_result() {
+    let a = [0xFF; 32];
+    let program = vec![
+        Operation::Push32(a),
+        Operation::Push32(new_32_byte_immediate(2)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, 254);
+}
+
+#[test]
+fn mul_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mul]);
+}
+
+#[test]
 fn push_push_pop() {
     // Push two values to the stack and then pop once
     // The program result should be equal to the first
