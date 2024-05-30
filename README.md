@@ -16,8 +16,9 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 
 1. (0x01) ADD
 1. (0x02) MUL
-1. (0x7F) PUSH32
 1. (0x50) POP
+1. (0x5B) JUMPDEST
+1. (0x7F) PUSH32
 
 </details>
 
@@ -86,7 +87,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x58) PC
 1. (0x59) MSIZE
 1. (0x5A) GAS
-1. (0x5B) JUMPDEST
 1. (0x5C) TLOAD
 1. (0x5D) TSTORE
 1. (0x5E) MCOPY
