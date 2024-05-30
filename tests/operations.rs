@@ -24,286 +24,55 @@ fn run_program_assert_revert(program: Vec<Operation>) {
     run_program_assert_result(program, REVERT_EXIT_CODE);
 }
 
-fn new_32_byte_immediate(value: u8) -> [u8; 32] {
-    let mut arr = [0; 32];
-    arr[31] = value;
-    arr
-}
+#[test]
+fn push_once() {
+    let the_answer: u8 = 0_u8;
 
-fn new_push_op(bytes: &[u8]) -> Operation {
-    Operation::Push(BigUint::from_bytes_be(bytes.into()))
+    // Test for PUSH0, PUSH1, ... , PUSH32
+    for i in 0..33 {
+        let bytes = vec![the_answer; i];
+        let value = BigUint::from_bytes_be(&bytes);
+        let program = vec![Operation::Push(value)];
+        run_program_assert_result(program, the_answer);
+    }
 }
 
 #[test]
-fn push0_once() {
-    let the_answer = 0;
-    let program = vec![new_push_op(&[the_answer; 32])];
+fn push_twice() {
+    let the_answer: u8 = 42;
+
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(the_answer)),
+    ];
     run_program_assert_result(program, the_answer);
 }
 
 #[test]
-fn push1_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 1])];
-    run_program_assert_result(program, the_answer);
-}
+fn push_fill_stack() {
+    let stack_top: u8 = 88;
 
-#[test]
-fn push2_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 2])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push3_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 3])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push4_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 4])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push5_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 5])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push6_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 6])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push7_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 7])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push8_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 8])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push9_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 9])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push10_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 10])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push11_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 11])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push12_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 12])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push13_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 13])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push14_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 14])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push15_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 15])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push16_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 16])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push17_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 17])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push18_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 18])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push19_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 19])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push20_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 20])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push21_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 21])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push22_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 22])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push23_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 23])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push24_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 24])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push25_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 25])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push26_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 26])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push27_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 27])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push28_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 28])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push29_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 29])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push30_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 30])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push31_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 31])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push32_once() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[the_answer; 32])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push32_twice() {
-    let the_answer = 42;
-    let program = vec![new_push_op(&[0]), new_push_op(&[the_answer; 32])];
-    run_program_assert_result(program, the_answer);
-}
-
-#[test]
-fn push32_fill_stack() {
-    let stack_top = 88;
     // Push 1024 times
-    let program = vec![new_push_op(&[stack_top; 32]); 1024];
+    let program = vec![Operation::Push(BigUint::from(stack_top)); 1024];
     run_program_assert_result(program, stack_top);
 }
 
 #[test]
-fn push32_stack_overflow() {
+fn push_stack_overflow() {
     // Push 1025 times
-    let program = vec![new_push_op(&[88; 32]); 1025];
+    let program = vec![Operation::Push(BigUint::from(88_u8)); 1025];
     run_program_assert_revert(program);
 }
 
 #[test]
-fn push32_push32_add() {
-    let (a, b) = (11, 31);
+fn push_push_add() {
+    let (a, b): (u8, u8) = (11, 31);
 
     let program = vec![
-        new_push_op(&new_32_byte_immediate(a)),
-        new_push_op(&new_32_byte_immediate(b)),
+        Operation::Push(BigUint::from(a)),
+        Operation::Push(BigUint::from(b)),
         Operation::Add,
     ];
-    run_program_assert_result(program, a + b);
-}
-
-#[test]
-fn push2_push1_add() {
-    let (a, b) = (11, 31);
-
-    let program = vec![new_push_op(&[0, a]), new_push_op(&[b]), Operation::Add];
     run_program_assert_result(program, a + b);
 }
 
@@ -313,14 +82,15 @@ fn add_with_stack_underflow() {
 }
 
 #[test]
-fn push32_push32_pop() {
+fn push_push_pop() {
     // Push two values to the stack and then pop once
     // The program result should be equal to the first
     // pushed value
-    let (a, b) = (1, 2);
+    let (a, b): (u8, u8) = (1, 2);
+
     let program = vec![
-        new_push_op(&new_32_byte_immediate(a)),
-        new_push_op(&new_32_byte_immediate(b)),
+        Operation::Push(BigUint::from(a)),
+        Operation::Push(BigUint::from(b)),
         Operation::Pop,
     ];
     run_program_assert_result(program, a);
