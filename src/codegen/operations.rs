@@ -54,8 +54,7 @@ fn codegen_push<'c, 'r>(
         location,
     ));
 
-    let constant_value =
-        Attribute::parse(context, &format!("{} : i256", value_to_push)).unwrap();
+    let constant_value = Attribute::parse(context, &format!("{} : i256", value_to_push)).unwrap();
     let constant_value = ok_block
         .append_operation(arith::constant(context, constant_value, location))
         .result(0)?
