@@ -103,9 +103,9 @@ fn substraction_wraps_the_result() {
     run_program_assert_result(program, result);
 }
 
+#[test]
 fn sub_add_wrapping() {
     let a = [0xFF; 32];
-    let b = [10; 32]; 
 
     let program = vec![
         Operation::Push32(a),
