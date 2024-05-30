@@ -145,7 +145,6 @@ fn codegen_byte<'c, 'r>(
     codegen_ctx: CodegenCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
-
     let start_block = region.append_block(Block::new(&[]));
     let context = &codegen_ctx.mlir_context;
     let location = Location::unknown(context);
@@ -165,7 +164,6 @@ fn codegen_byte<'c, 'r>(
     let offset_ok_block = region.append_block(Block::new(&[]));
 
     let end_block = region.append_block(Block::new(&[]));
-
 
     start_block.append_operation(cf::cond_br(
         context,
@@ -206,7 +204,7 @@ fn codegen_byte<'c, 'r>(
         ))
         .result(0)?
         .into();
-    
+
     // compare  offset > max_shift?
     let is_offset_out_of_bounds = ok_block
         .append_operation(
@@ -221,7 +219,7 @@ fn codegen_byte<'c, 'r>(
         )
         .result(0)?
         .into();
-    
+
     // if offset > max_shift => branch to out_of_bounds_block
     ok_block.append_operation(cf::cond_br(
         context,
@@ -233,7 +231,6 @@ fn codegen_byte<'c, 'r>(
         location,
     ));
 
-
     let zero = out_of_bounds_block
         .append_operation(arith::constant(
             context,
@@ -242,16 +239,11 @@ fn codegen_byte<'c, 'r>(
         ))
         .result(0)?
         .into();
-    
+
     // push zero to the stack
     stack_push(context, &out_of_bounds_block, zero)?;
 
-    out_of_bounds_block.append_operation(cf::br(
-        &end_block,
-        &[],
-        location
-    ));
-
+    out_of_bounds_block.append_operation(cf::br(&end_block, &[], location));
 
     // the idea is to use left and right shifts in order to extract the
     // desired byte from the value, removing the rest of the bytes
@@ -293,14 +285,10 @@ fn codegen_byte<'c, 'r>(
         ))
         .result(0)?
         .into();
-    
+
     stack_push(context, &offset_ok_block, result)?;
-    
-    offset_ok_block.append_operation(cf::br(
-        &end_block,
-        &[],
-        location
-    ));
+
+    offset_ok_block.append_operation(cf::br(&end_block, &[], location));
 
     Ok((start_block, end_block))
 }
