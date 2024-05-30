@@ -179,15 +179,13 @@ pub enum Operation {
     Add,
     Mul,
     Pop,
-    Jumpdest(usize),
+    Jumpdest { pc: usize },
     Push32([u8; 32]),
 }
 
 #[derive(Debug, Clone)]
 pub struct Program {
     pub(crate) operations: Vec<Operation>,
-    #[allow(dead_code)]
-    pub(crate) jumpdests: Vec<usize>,
 }
 
 impl Program {
@@ -209,29 +207,18 @@ impl Program {
                     pc += 31;
                     Operation::Push32(x)
                 }
-                Opcode::JUMPDEST => Operation::Jumpdest(pc),
+                Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
             pc += 1;
         }
-        Self::from(operations)
+        Program { operations }
     }
 }
 
 impl From<Vec<Operation>> for Program {
-    fn from(operations: Vec<Operation>) -> Program {
-        let jumpdests = operations
-            .iter()
-            .filter_map(|op| match op {
-                Operation::Jumpdest(pc) => Some(*pc),
-                _ => None,
-            })
-            .collect();
-
-        Program {
-            operations,
-            jumpdests,
-        }
+    fn from(operations: Vec<Operation>) -> Self {
+        Program { operations }
     }
 }

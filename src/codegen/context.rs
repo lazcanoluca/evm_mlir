@@ -1,16 +1,26 @@
-use melior::{ir::Module as MeliorModule, Context as MeliorContext};
+use std::collections::BTreeMap;
+
+use melior::{ir::BlockRef, Context as MeliorContext};
 
 use crate::program::Program;
 
-/// Global codegen context
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct CodegenCtx<'a> {
+#[derive(Debug, Clone)]
+pub(crate) struct OperationCtx<'c> {
     /// The MLIR context.
-    pub mlir_context: &'a MeliorContext,
+    pub mlir_context: &'c MeliorContext,
     /// The MLIR module.
-    pub mlir_module: &'a MeliorModule<'a>,
+    // pub mlir_module: &'c MeliorModule<'c>,
     /// The compile session info.
-    // pub session: &'a Session,
+    // pub session: &'c Session,
     /// The program IR.
-    pub program: &'a Program,
+    pub program: &'c Program,
+    /// Reference to the revert block.
+    /// This block takes care of reverts.
+    pub revert_block: BlockRef<'c, 'c>,
+    /// Reference to the jump table block.
+    /// This block receives the PC as an argument and jumps to the block corresponding to that PC,
+    /// or reverts in case the destination is not a JUMPDEST.
+    pub jumptable_block: BlockRef<'c, 'c>,
+    /// Blocks to jump to. This are registered dynamically as JUMPDESTs are processed.
+    pub jumpdest_blocks: BTreeMap<usize, BlockRef<'c, 'c>>,
 }
