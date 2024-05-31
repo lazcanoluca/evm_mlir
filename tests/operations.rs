@@ -117,15 +117,14 @@ fn div_signed_division() {
     //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
     //If we take the lowest byte
     //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
-    let mut expected_result = BigUint::from(0_u8);
-    expected_result.set_bit(2, true);
+    let expected_result = (&a / &b).try_into().unwrap();
 
     let program = vec![
         Operation::Push(b), //
         Operation::Push(a), //
         Operation::Div,     //
     ];
-    run_program_assert_result(program, expected_result.try_into().unwrap());
+    run_program_assert_result(program, expected_result);
 }
 
 #[test]
@@ -146,7 +145,7 @@ fn div_with_remainder() {
 fn div_with_zero_denominator() {
     let (a, b) = (BigUint::from(5_u8), BigUint::from(0_u8));
 
-    let expected_result = BigUint::from(0_u8).try_into().unwrap();
+    let expected_result: u8 = 0_u8;
 
     let program = vec![
         Operation::Push(b), //
@@ -160,7 +159,7 @@ fn div_with_zero_denominator() {
 fn div_with_zero_numerator() {
     let (a, b) = (BigUint::from(0_u8), BigUint::from(10_u8));
 
-    let expected_result = BigUint::from(0_u8).try_into().unwrap();
+    let expected_result = (&a / &b).try_into().unwrap();
 
     let program = vec![
         Operation::Push(b), //
