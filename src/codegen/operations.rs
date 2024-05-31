@@ -25,6 +25,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Add => codegen_add(op_ctx, region),
         Operation::Mul => codegen_mul(op_ctx, region),
         Operation::Pop => codegen_pop(op_ctx, region),
+        Operation::PC { pc } => codegen_pc(op_ctx, region, pc),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
     }
@@ -188,4 +189,12 @@ fn codegen_jumpdest<'c>(
     op_ctx.register_jump_destination(pc, landing_block);
 
     Ok((landing_block, landing_block))
+}
+
+fn codegen_pc<'c>(
+    _op_ctx: &mut OperationCtx<'c>,
+    _region: &'c Region<'c>,
+    _pc: usize,
+) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
+    todo!()
 }

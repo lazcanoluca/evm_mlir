@@ -70,7 +70,7 @@ pub enum Opcode {
     // SSTORE = 0x55,
     // JUMP = 0x56,
     // JUMPI = 0x57,
-    // PC = 0x58,
+    PC = 0x58,
     // MSIZE = 0x59,
     // GAS = 0x5A,
     JUMPDEST = 0x5B,
@@ -169,6 +169,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::MUL as u8 => Opcode::MUL,
             x if x == Opcode::POP as u8 => Opcode::POP,
+            x if x == Opcode::PC as u8 => Opcode::PC,
             x if x == Opcode::JUMPDEST as u8 => Opcode::JUMPDEST,
             x if x == Opcode::PUSH0 as u8 => Opcode::PUSH0,
             x if x == Opcode::PUSH1 as u8 => Opcode::PUSH1,
@@ -213,6 +214,7 @@ pub enum Operation {
     Add,
     Mul,
     Pop,
+    PC { pc: usize },
     Jumpdest { pc: usize },
     Push(BigUint),
 }
@@ -235,6 +237,7 @@ impl Program {
                 Opcode::ADD => Operation::Add,
                 Opcode::MUL => Operation::Mul,
                 Opcode::POP => Operation::Pop,
+                Opcode::PC => Operation::PC { pc },
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
