@@ -143,6 +143,48 @@ fn push_push_add() {
 }
 
 #[test]
+fn push_push_sub() {
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sub,
+    ];
+    run_program_assert_result(program, 20);
+}
+
+#[test]
+fn substraction_wraps_the_result() {
+    let (a, b) = (BigUint::from(10_u8), BigUint::from(0_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sub,
+    ];
+
+    let result = 0_u8.wrapping_sub(10);
+
+    run_program_assert_result(program, result);
+}
+
+#[test]
+fn sub_add_wrapping() {
+    let a = (BigUint::from(1_u8) << 256) - 1_u8;
+
+    let program = vec![
+        Operation::Push(a),
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Add,
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Sub,
+    ];
+
+    run_program_assert_result(program, 1);
+}
+
+#[test]
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
 }
