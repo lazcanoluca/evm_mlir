@@ -27,50 +27,15 @@ pub fn generate_code_for_op<'c>(
         Operation::Sub => codegen_sub(op_ctx, region),
         Operation::Mul => codegen_mul(op_ctx, region),
         Operation::Div => codegen_div(op_ctx, region),
-        Operation::Exp => codegen_exp(context, region),
         Operation::Pop => codegen_pop(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
+        Operation::Exp => codegen_exp(op_ctx, region),
     }
 }
 
-fn codegen_push<'c, 'r>(
-    op_ctx: &mut OperationCtx<'c>,
-    region: &'r Region<'c>,
-    value_to_push: BigUint,
-) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
-    let start_block = region.append_block(Block::new(&[]));
-    let context = &op_ctx.mlir_context;
-    let location = Location::unknown(context);
-
-    // Check there's enough space in stack
-    let flag = check_stack_has_space_for(context, &start_block, 1)?;
-
-    let ok_block = region.append_block(Block::new(&[]));
-
-    start_block.append_operation(cf::cond_br(
-        context,
-        flag,
-        &ok_block,
-        &op_ctx.revert_block,
-        &[],
-        &[],
-        location,
-    ));
-
-    let constant_value = Attribute::parse(context, &format!("{} : i256", value_to_push)).unwrap();
-    let constant_value = ok_block
-        .append_operation(arith::constant(context, constant_value, location))
-        .result(0)?
-        .into();
-
-    stack_push(context, &ok_block, constant_value)?;
-
-    Ok((start_block, ok_block))
-}
-
-fn codegen_add<'c, 'r>(
+fn codegen_exp<'c, 'r>(
     op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
@@ -106,7 +71,6 @@ fn codegen_add<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
-// TODO: use const generics to generalize for pushN
 fn codegen_push<'c, 'r>(
     op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,

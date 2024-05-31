@@ -326,7 +326,7 @@ fn push_push_exp() {
 }
 
 #[test]
-fn exp_with_should_wrap() {
+fn exp_with_overflow_should_wrap() {
     let a = BigUint::from(2_u8);
     let b = BigUint::from(256_u16);
 

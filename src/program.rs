@@ -14,7 +14,7 @@ pub enum Opcode {
     // SMOD = 0x07,
     // ADDMOD = 0x08,
     // MULMOD = 0x09,
-    // EXP = 0x0A,
+    EXP = 0x0A,
     // SIGNEXTEND = 0x0B,
 
     // unused 0x0C-0x0F
@@ -219,6 +219,7 @@ pub enum Operation {
     Mul,
     Pop,
     Div,
+    Exp,
     Jumpdest { pc: usize },
     Push(BigUint),
     Byte,
@@ -244,6 +245,7 @@ impl Program {
                 Opcode::MUL => Operation::Mul,
                 Opcode::POP => Operation::Pop,
                 Opcode::DIV => Operation::Div,
+                Opcode::EXP => Operation::Exp,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
