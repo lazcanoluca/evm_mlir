@@ -282,7 +282,7 @@ fn test_and() {
 #[test]
 fn test_and_with_zero() {
     let a = BigUint::from(0_u8);
-    let b = BigUint::from(0xFF as u8);
+    let b = BigUint::from(0xFF_u8);
 
     let expected_result = (a.clone() & b.clone()).try_into().unwrap();
 
