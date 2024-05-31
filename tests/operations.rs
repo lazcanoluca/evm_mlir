@@ -74,6 +74,70 @@ fn push_stack_overflow() {
 }
 
 #[test]
+fn swap_first() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Swap(1),
+    ];
+
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn swap_16_and_get_the_swaped_one() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(3_u8)),
+        Operation::Swap(16),
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+        Operation::Pop,
+    ];
+
+    run_program_assert_result(program, 3);
+}
+
+#[test]
+fn swap_stack_underflow() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Swap(2),
+    ];
+
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn push_push_add() {
     let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
 

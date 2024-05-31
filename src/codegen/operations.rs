@@ -79,7 +79,7 @@ fn codegen_swap<'c, 'r>(
     let location = Location::unknown(context);
 
     // Check there's enough elements in stack
-    let flag = check_stack_has_at_least(context, &start_block, nth)?;
+    let flag = check_stack_has_at_least(context, &start_block, nth + 1)?;
 
     // Create REVERT block
     let revert_block = region.append_block(generate_revert_block(context)?);
@@ -96,7 +96,7 @@ fn codegen_swap<'c, 'r>(
         location,
     ));
 
-    swap_stack_elements(context, &ok_block, 1, nth)?;
+    swap_stack_elements(context, &ok_block, 1, nth + 1)?;
 
     Ok((start_block, ok_block))
 }

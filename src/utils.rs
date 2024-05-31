@@ -215,6 +215,8 @@ pub fn swap_stack_elements<'ctx>(
     position_1: u32,
     position_2: u32,
 ) -> Result<(), CodegenError> {
+    debug_assert!(position_1 < MAX_STACK_SIZE as u32);
+    debug_assert!(position_2 < MAX_STACK_SIZE as u32);
     let location = Location::unknown(context);
 
     let (first_element, first_elem_address) = get_nth_from_stack(context, block, position_1)?;
