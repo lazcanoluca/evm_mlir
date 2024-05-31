@@ -16,6 +16,7 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 
 1. (0x01) ADD
 1. (0x02) MUL
+1. (0x0A) EXP
 1. (0x5F) PUSH0
 1. (0x60) PUSH1
 1. (0x61) PUSH2
@@ -64,7 +65,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x07) SMOD
 1. (0x08) ADDMOD
 1. (0x09) MULMOD
-1. (0x0A) EXP
 1. (0x0B) SIGNEXTEND
 1. (0x10) LT
 1. (0x11) GT
