@@ -19,6 +19,7 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x04) DIV
 1. (0x1A) BYTE
 1. (0x50) POP
+1. (0x58) PC
 1. (0x5B) JUMPDEST
 1. (0x5F) PUSH0
 1. (0x60) PUSH1
@@ -116,7 +117,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x55) SSTORE
 1. (0x56) JUMP
 1. (0x57) JUMPI
-1. (0x58) PC
 1. (0x59) MSIZE
 1. (0x5A) GAS
 1. (0x5C) TLOAD
