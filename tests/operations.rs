@@ -91,6 +91,90 @@ fn add_with_stack_underflow() {
 }
 
 #[test]
+fn div_without_remainder() {
+    let (a, b) = (BigUint::from(20_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_signed_division() {
+    // a = [1, 0, 0, 0, .... , 0, 0, 0, 0] == 1 << 255
+    let mut a = BigUint::from(0_u8);
+    a.set_bit(255, true);
+    // b = [0, 0, 1, 0, .... , 0, 0, 0, 0] == 1 << 253
+    let mut b = BigUint::from(0_u8);
+    b.set_bit(253, true);
+
+    //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
+    //If we take the lowest byte
+    //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,     //
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_remainder() {
+    let (a, b) = (BigUint::from(21_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_denominator() {
+    let (a, b) = (BigUint::from(5_u8), BigUint::from(0_u8));
+
+    let expected_result: u8 = 0_u8;
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_numerator() {
+    let (a, b) = (BigUint::from(0_u8), BigUint::from(10_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Div]);
+}
+
+#[test]
 fn push_push_normal_mul() {
     let (a, b) = (BigUint::from(2_u8), BigUint::from(42_u8));
 
