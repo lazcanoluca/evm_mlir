@@ -369,9 +369,40 @@ fn codegen_jumpdest<'c>(
     Ok((landing_block, landing_block))
 }
 
-fn codegen_jump<'c, 'r>(
-    _op_ctx: &mut OperationCtx<'c>,
-    _region: &'r Region<'c>,
+fn codegen_jump<'c, 'r: 'c>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
-    todo!()
+    // it reverts if Counter offset is not a JUMPDEST.
+    // The error is generated even if the JUMP would not have been done
+
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 1)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let pc = stack_pop(context, &ok_block)?;
+
+    // appends operation to ok_block to jump to the `jump table block``
+    // in the jump table block the pc is checked and if its ok
+    // then it jumps to the block associated with that pc
+    op_ctx.add_jump_op(ok_block, pc, location);
+
+    // TODO: improve this
+    let empty_block = region.append_block(Block::new(&[]));
+    Ok((start_block, empty_block))
 }
