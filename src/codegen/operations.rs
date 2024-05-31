@@ -1,4 +1,3 @@
-
 use melior::{
     dialect::{arith, cf},
     ir::{Attribute, Block, BlockRef, Location, Region},
@@ -10,7 +9,8 @@ use crate::{
     errors::CodegenError,
     program::Operation,
     utils::{
-        check_denominator_is_zero, check_stack_has_at_least, check_stack_has_space_for, generate_revert_block, integer_constant_from_i64, stack_pop, stack_push
+        check_denominator_is_zero, check_stack_has_at_least, check_stack_has_space_for,
+        generate_revert_block, integer_constant_from_i64, stack_pop, stack_push,
     },
 };
 use num_bigint::BigUint;
@@ -143,7 +143,6 @@ fn codegen_sub<'c, 'r>(
 
     Ok((start_block, ok_block))
 }
-
 
 fn codegen_div<'c, 'r>(
     op_ctx: &mut OperationCtx<'c>,
