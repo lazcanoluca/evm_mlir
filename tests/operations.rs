@@ -255,26 +255,21 @@ fn mod_with_result_zero() {
 
 #[test]
 fn mod_with_zero_denominator() {
-    let program = vec![
-        Operation::Push(BigUint::from(0_u8)),
-        Operation::Push(BigUint::from(21_u8)),
-        Operation::Mod,
-    ];
+    let (num, den) = (BigUint::from(10_u8), BigUint::from(0_u8));
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
     run_program_assert_result(program, 0);
 }
 
 #[test]
 fn mod_with_zero_numerator() {
-    let program = vec![
-        Operation::Push(BigUint::from(10_u8)),
-        Operation::Push(BigUint::from(0_u8)),
-        Operation::Mod,
-    ];
+    let (num, den) = (BigUint::from(0_u8), BigUint::from(25_u8));
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
     run_program_assert_result(program, 0);
 }
 
 #[test]
 fn mod_with_stack_underflow() {
-    // Pop with an empty stack
     run_program_assert_revert(vec![Operation::Mod]);
 }
