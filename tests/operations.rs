@@ -269,3 +269,21 @@ fn jumpdest() {
     ];
     run_program_assert_result(program, expected)
 }
+
+#[test]
+fn test_iszero_true() {
+    let program = vec![Operation::Push(BigUint::from(0_u8)), Operation::IsZero];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_iszero_false() {
+    let program = vec![Operation::Push(BigUint::from(1_u8)), Operation::IsZero];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_iszero_stack_underflow() {
+    let program = vec![Operation::IsZero];
+    run_program_assert_revert(program);
+}

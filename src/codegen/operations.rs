@@ -37,9 +37,10 @@ pub fn generate_code_for_op<'c>(
 fn codegen_iszero<'c, 'r>(
     op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
-) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError>{
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
 
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 1)?;
@@ -72,9 +73,10 @@ fn codegen_iszero<'c, 'r>(
         .result(0)?
         .into();
 
+    stack_push(context, &val_zero_bloq, constant_value)?;
     val_zero_bloq.append_operation(cf::br(&return_block, &[], location));
 
-    let constant_value = val_not_zero_bloq
+    let result = val_not_zero_bloq
         .append_operation(arith::constant(
             context,
             integer_constant_from_i64(context, 0i64).into(),
@@ -83,6 +85,7 @@ fn codegen_iszero<'c, 'r>(
         .result(0)?
         .into();
 
+    stack_push(context, &val_not_zero_bloq, result)?;
     val_not_zero_bloq.append_operation(cf::br(&return_block, &[], location));
 
     ok_block.append_operation(cf::cond_br(
@@ -96,7 +99,6 @@ fn codegen_iszero<'c, 'r>(
     ));
 
     Ok((start_block, return_block))
-
 }
 
 fn codegen_push<'c, 'r>(
