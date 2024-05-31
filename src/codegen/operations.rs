@@ -1,6 +1,9 @@
 use melior::{
     dialect::{arith, cf},
-    ir::{Attribute, Block, BlockRef, Location, Region},
+    ir::{
+        attribute::IntegerAttribute, r#type::IntegerType, Attribute, Block, BlockRef, Location,
+        Region,
+    },
 };
 use num_bigint::BigUint;
 
@@ -192,9 +195,40 @@ fn codegen_jumpdest<'c>(
 }
 
 fn codegen_pc<'c>(
-    _op_ctx: &mut OperationCtx<'c>,
-    _region: &'c Region<'c>,
-    _pc: usize,
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'c Region<'c>,
+    pc: usize,
 ) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
-    todo!()
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    let flag = check_stack_has_space_for(context, &start_block, 1)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let uint256 = IntegerType::new(context, 256);
+
+    let pc_value = ok_block
+        .append_operation(arith::constant(
+            context,
+            IntegerAttribute::new(uint256.into(), pc as i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, pc_value)?;
+
+    Ok((start_block, ok_block))
 }
