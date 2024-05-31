@@ -17,7 +17,7 @@ pub enum Opcode {
 
     // unused 0x0C-0x0F
 
-    // LT = 0x10,
+    LT = 0x10,
     // GT = 0x11,
     // SLT = 0x12,
     // SGT = 0x13,
@@ -213,6 +213,7 @@ pub enum Operation {
     Add,
     Mul,
     Pop,
+    Lt,
     Jumpdest { pc: usize },
     Push(BigUint),
 }
@@ -234,6 +235,7 @@ impl Program {
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
                 Opcode::MUL => Operation::Mul,
+                Opcode::LT => Operation::Lt,
                 Opcode::POP => Operation::Pop,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
