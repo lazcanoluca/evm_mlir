@@ -252,7 +252,6 @@ fn codegen_mod<'c, 'r>(
 
     den_zero_bloq.append_operation(cf::br(&return_block, &[], location));
 
-    // N is not zero path
     let mod_result = den_not_zero_bloq
         .append_operation(arith::remui(num, den, location))
         .result(0)?
