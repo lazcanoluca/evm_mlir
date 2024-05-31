@@ -141,6 +141,41 @@ fn pop_with_stack_underflow() {
 }
 
 #[test]
+fn push_push_byte() {
+    let mut value: [u8; 32] = [0; 32];
+    let desired_byte = 0xff;
+    let offset: u8 = 16;
+    value[offset as usize] = desired_byte;
+    let value: BigUint = BigUint::from_bytes_be(&value);
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(offset)),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, desired_byte);
+}
+
+#[test]
+fn byte_with_stack_underflow() {
+    let program = vec![Operation::Byte];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn byte_with_offset_out_of_bounds() {
+    // must consider this case yet
+    let value: [u8; 32] = [0xff; 32];
+    let value: BigUint = BigUint::from_bytes_be(&value);
+    let offset = BigUint::from(32_u8);
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(offset),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
 fn jumpdest() {
     let expected = 5;
     let program = vec![

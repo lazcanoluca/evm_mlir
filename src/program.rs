@@ -27,7 +27,7 @@ pub enum Opcode {
     // OR = 0x17,
     // XOR = 0x18,
     // NOT = 0x19,
-    // BYTE = 0x1A,
+    BYTE = 0x1A,
     // SHL = 0x1B,
     // SHR = 0x1C,
     // SAR = 0x1D,
@@ -203,6 +203,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH30 as u8 => Opcode::PUSH30,
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
+            x if x == Opcode::BYTE as u8 => Opcode::BYTE,
             _ => Opcode::UNUSED,
         }
     }
@@ -215,6 +216,7 @@ pub enum Operation {
     Pop,
     Jumpdest { pc: usize },
     Push(BigUint),
+    Byte,
 }
 
 #[derive(Debug, Clone)]
@@ -428,6 +430,7 @@ impl Program {
                     pc += 31;
                     Operation::Push(BigUint::from_bytes_be(x))
                 }
+                Opcode::BYTE => Operation::Byte,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
