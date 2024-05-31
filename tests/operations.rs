@@ -86,8 +86,134 @@ fn push_push_add() {
 }
 
 #[test]
+fn push_push_sub() {
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sub,
+    ];
+    run_program_assert_result(program, 20);
+}
+
+#[test]
+fn substraction_wraps_the_result() {
+    let (a, b) = (BigUint::from(10_u8), BigUint::from(0_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sub,
+    ];
+
+    let result = 0_u8.wrapping_sub(10);
+
+    run_program_assert_result(program, result);
+}
+
+#[test]
+fn sub_add_wrapping() {
+    let a = (BigUint::from(1_u8) << 256) - 1_u8;
+
+    let program = vec![
+        Operation::Push(a),
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Add,
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Sub,
+    ];
+
+    run_program_assert_result(program, 1);
+}
+
+#[test]
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
+}
+
+#[test]
+fn div_without_remainder() {
+    let (a, b) = (BigUint::from(20_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_signed_division() {
+    // a = [1, 0, 0, 0, .... , 0, 0, 0, 0] == 1 << 255
+    let mut a = BigUint::from(0_u8);
+    a.set_bit(255, true);
+    // b = [0, 0, 1, 0, .... , 0, 0, 0, 0] == 1 << 253
+    let mut b = BigUint::from(0_u8);
+    b.set_bit(253, true);
+
+    //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
+    //If we take the lowest byte
+    //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,     //
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_remainder() {
+    let (a, b) = (BigUint::from(21_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_denominator() {
+    let (a, b) = (BigUint::from(5_u8), BigUint::from(0_u8));
+
+    let expected_result: u8 = 0_u8;
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_numerator() {
+    let (a, b) = (BigUint::from(0_u8), BigUint::from(10_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Div]);
 }
 
 #[test]
@@ -159,6 +285,27 @@ fn sar_with_stack_underflow() {
 }
 
 #[test]
+fn push_push_byte() {
+    let mut value: [u8; 32] = [0; 32];
+    let desired_byte = 0xff;
+    let offset: u8 = 16;
+    value[offset as usize] = desired_byte;
+    let value: BigUint = BigUint::from_bytes_be(&value);
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(offset)),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, desired_byte);
+}
+
+#[test]
+fn byte_with_stack_underflow() {
+    let program = vec![Operation::Byte];
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn sar_with_negative_value_preserves_sign() {
     // in this example the the value to be shifted is a 256 bit number
     // where the most significative bit is 1 cand the rest of the bits are 0.
@@ -204,6 +351,20 @@ fn sar_with_shift_out_of_bounds() {
     // in this case the expected result is 0xff because of the sign extension
     let expected_result = 0xff;
     run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn byte_with_offset_out_of_bounds() {
+    // must consider this case yet
+    let value: [u8; 32] = [0xff; 32];
+    let value: BigUint = BigUint::from_bytes_be(&value);
+    let offset = BigUint::from(32_u8);
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(offset),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, 0);
 }
 
 #[test]
