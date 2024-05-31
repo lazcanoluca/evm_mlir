@@ -9,8 +9,9 @@ use crate::{
     errors::CodegenError,
     program::Operation,
     utils::{
-        check_stack_has_at_least, check_stack_has_space_for, generate_revert_block, stack_pop,
-        stack_push, swap_stack_elements, check_denominator_is_zero, integer_constant_from_i64
+        check_denominator_is_zero, check_stack_has_at_least, check_stack_has_space_for,
+        generate_revert_block, integer_constant_from_i64, stack_pop, stack_push,
+        swap_stack_elements,
     },
 };
 use num_bigint::BigUint;
