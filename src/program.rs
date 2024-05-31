@@ -69,7 +69,7 @@ pub enum Opcode {
     // SLOAD = 0x54,
     // SSTORE = 0x55,
     // JUMP = 0x56,
-    // JUMPI = 0x57,
+    JUMPI = 0x57,
     // PC = 0x58,
     // MSIZE = 0x59,
     // GAS = 0x5A,
@@ -205,6 +205,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::BYTE as u8 => Opcode::BYTE,
+            x if x == Opcode::JUMPI as u8 => Opcode::JUMPI,
             _ => Opcode::UNUSED,
         }
     }
@@ -219,6 +220,7 @@ pub enum Operation {
     Jumpdest { pc: usize },
     Push(BigUint),
     Byte,
+    Jumpi,
 }
 
 #[derive(Debug, Clone)]
@@ -434,6 +436,7 @@ impl Program {
                     Operation::Push(BigUint::from_bytes_be(x))
                 }
                 Opcode::BYTE => Operation::Byte,
+                Opcode::JUMPI => Operation::Jumpi,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
