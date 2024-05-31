@@ -1,13 +1,18 @@
-use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
-use num_bigint::{BigUint, BigInt};
+use evm_mlir::{
+    compile_binary,
+    constants::REVERT_EXIT_CODE,
+    program::{Operation, Program},
+};
+use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
-fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
+fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
+    let program = Program::from(operations);
     let output_file = NamedTempFile::new()
         .expect("failed to generate tempfile")
         .into_temp_path();
 
-    compile_binary(program, &output_file).expect("failed to compile program");
+    compile_binary(&program, &output_file).expect("failed to compile program");
 
     assert!(output_file.exists(), "output file does not exist");
 
@@ -136,43 +141,12 @@ fn pop_with_stack_underflow() {
 }
 
 #[test]
-fn test_sgt_greater_than() {
-    let a = BigInt::from(-1);
-    let b = BigInt::from(9);
-
+fn jumpdest() {
+    let expected = 5;
     let program = vec![
-        Operation::Push(a),
-        Operation::Push(b),
-        Operation::Sgt,
+        Operation::Jumpdest { pc: 0 },
+        Operation::Push(BigUint::from(expected)),
+        Operation::Jumpdest { pc: 34 },
     ];
-
-    run_program_assert_result(program, 1);
-}
-
-#[test]
-fn test_sgt_less_than() {
-    let a = BigInt::from(9);
-    let b = BigInt::from(-1);
-
-    let program = vec![
-        Operation::Push(a),
-        Operation::Push(b),
-        Operation::Sgt,
-    ];
-
-    run_program_assert_result(program, 0);
-}
-
-#[test]
-fn test_sgt_equal() {
-    let a = BigUint::from(9);
-    let b = BigUint::from(9);
-
-    let program = vec![
-        Operation::Push(a),
-        Operation::Push(b),
-        Operation::Sgt,
-    ];
-
-    run_program_assert_result(program, 0);
+    run_program_assert_result(program, expected)
 }
