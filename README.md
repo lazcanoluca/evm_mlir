@@ -53,6 +53,22 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x7D) PUSH30
 1. (0x7E) PUSH31
 1. (0x7F) PUSH32
+1. (0x80) DUP1
+1. (0x81) DUP2
+1. (0x82) DUP3
+1. (0x83) DUP4
+1. (0x84) DUP5
+1. (0x85) DUP6
+1. (0x86) DUP7
+1. (0x87) DUP8
+1. (0x88) DUP9
+1. (0x89) DUP10
+1. (0x8A) DUP11
+1. (0x8B) DUP12
+1. (0x8C) DUP13
+1. (0x8D) DUP14
+1. (0x8E) DUP15
+1. (0x8F) DUP16
 
 </details>
 
@@ -122,22 +138,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x5C) TLOAD
 1. (0x5D) TSTORE
 1. (0x5E) MCOPY
-1. (0x80) DUP1
-1. (0x81) DUP2
-1. (0x82) DUP3
-1. (0x83) DUP4
-1. (0x84) DUP5
-1. (0x85) DUP6
-1. (0x86) DUP7
-1. (0x87) DUP8
-1. (0x88) DUP9
-1. (0x89) DUP10
-1. (0x8A) DUP11
-1. (0x8B) DUP12
-1. (0x8C) DUP13
-1. (0x8D) DUP14
-1. (0x8E) DUP15
-1. (0x8F) DUP16
 1. (0x90) SWAP1
 1. (0x91) SWAP2
 1. (0x92) SWAP3
