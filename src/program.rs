@@ -68,7 +68,7 @@ pub enum Opcode {
     // MSTORE8 = 0x53,
     // SLOAD = 0x54,
     // SSTORE = 0x55,
-    // JUMP = 0x56,
+    JUMP = 0x56,
     // JUMPI = 0x57,
     // PC = 0x58,
     // MSIZE = 0x59,
@@ -204,6 +204,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
             x if x == Opcode::BYTE as u8 => Opcode::BYTE,
+            x if x == Opcode::JUMP as u8 => Opcode::JUMP,
             _ => Opcode::UNUSED,
         }
     }
@@ -217,6 +218,7 @@ pub enum Operation {
     Jumpdest { pc: usize },
     Push(BigUint),
     Byte,
+    Jump,
 }
 
 #[derive(Debug, Clone)]
@@ -238,6 +240,7 @@ impl Program {
                 Opcode::MUL => Operation::Mul,
                 Opcode::POP => Operation::Pop,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
+                Opcode::JUMP => Operation::Jump,
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
                     pc += 1;
