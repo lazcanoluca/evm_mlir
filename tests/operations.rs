@@ -236,28 +236,45 @@ fn jumpdest() {
 }
 
 #[test]
-fn push_push_mod() {
-    let (a, n) = (BigUint::from(31_u8), BigUint::from(10_u8));
+fn mod_with_non_zero_result() {
+    let (num, den) = (BigUint::from(31_u8), BigUint::from(10_u8));
+    let expected_result = (&num % &den).try_into().unwrap();
 
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn mod_with_result_zero() {
+    let (num, den) = (BigUint::from(10_u8), BigUint::from(2_u8));
+    let expected_result = (&num % &den).try_into().unwrap();
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn mod_with_zero_denominator() {
     let program = vec![
-        Operation::Push(a.clone()),
-        Operation::Push(n.clone()),
-        Operation::Add,
+        Operation::Push(BigUint::from(0_u8)),
+        Operation::Push(BigUint::from(21_u8)),
+        Operation::Mod,
     ];
-    run_program_assert_result(program, (a % n).try_into().unwrap());
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn mod_with_zero_numerator() {
+    let program = vec![
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Push(BigUint::from(0_u8)),
+        Operation::Mod,
+    ];
+    run_program_assert_result(program, 0);
 }
 
 #[test]
 fn mod_with_stack_underflow() {
     // Pop with an empty stack
     run_program_assert_revert(vec![Operation::Mod]);
-}
-
-#[test]
-fn mod_with_zero() {
-    run_program_assert_revert(vec![
-        Operation::Push(BigUint::from(31_u8)),
-        Operation::Push(BigUint::from(0_u8)),
-        Operation::Mod,
-    ]);
 }
