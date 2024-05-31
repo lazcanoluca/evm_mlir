@@ -16,7 +16,6 @@ pub enum Opcode {
     // SIGNEXTEND = 0x0B,
 
     // unused 0x0C-0x0F
-
     LT = 0x10,
     // GT = 0x11,
     // SLT = 0x12,
