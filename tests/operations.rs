@@ -1,12 +1,18 @@
-use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
+use evm_mlir::{
+    compile_binary,
+    constants::REVERT_EXIT_CODE,
+    program::{Operation, Program},
+};
+use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
-fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
+fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
+    let program = Program::from(operations);
     let output_file = NamedTempFile::new()
         .expect("failed to generate tempfile")
         .into_temp_path();
 
-    compile_binary(program, &output_file).expect("failed to compile program");
+    compile_binary(&program, &output_file).expect("failed to compile program");
 
     assert!(output_file.exists(), "output file does not exist");
 
@@ -23,56 +29,60 @@ fn run_program_assert_revert(program: Vec<Operation>) {
     run_program_assert_result(program, REVERT_EXIT_CODE);
 }
 
-fn new_32_byte_immediate(value: u8) -> [u8; 32] {
-    let mut arr = [0; 32];
-    arr[31] = value;
-    arr
+#[test]
+fn push_once() {
+    let value = BigUint::from(5_u8);
+
+    // For PUSH0
+    let program = vec![Operation::Push(BigUint::ZERO)];
+    run_program_assert_result(program, 0);
+
+    // For PUSH1, ... , PUSH32
+    for i in 0..32 {
+        let shifted_value: BigUint = value.clone() << (i * 8);
+        let program = vec![Operation::Push(shifted_value.clone())];
+        let expected_result: u8 = (shifted_value % 256_u32).try_into().unwrap();
+        run_program_assert_result(program, expected_result);
+    }
 }
 
 #[test]
-fn push32_once() {
-    let the_answer = 42;
-    let program = vec![Operation::Push32([the_answer; 32])];
-    run_program_assert_result(program, the_answer);
-}
+fn push_twice() {
+    let the_answer = BigUint::from(42_u8);
 
-#[test]
-fn push32_twice() {
-    let the_answer = 42;
     let program = vec![
-        Operation::Push32([0; 32]),
-        Operation::Push32([the_answer; 32]),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(the_answer.clone()),
     ];
-    run_program_assert_result(program, the_answer);
+    run_program_assert_result(program, the_answer.try_into().unwrap());
 }
 
 #[test]
-fn push32_fill_stack() {
-    let stack_top = 88;
+fn push_fill_stack() {
+    let stack_top = BigUint::from(88_u8);
+
     // Push 1024 times
-    let program = vec![Operation::Push32([stack_top; 32]); 1024];
-
-    run_program_assert_result(program, stack_top);
+    let program = vec![Operation::Push(stack_top.clone()); 1024];
+    run_program_assert_result(program, stack_top.try_into().unwrap());
 }
 
 #[test]
-fn push32_stack_overflow() {
+fn push_stack_overflow() {
     // Push 1025 times
-    let program = vec![Operation::Push32([88; 32]); 1025];
-
+    let program = vec![Operation::Push(BigUint::from(88_u8)); 1025];
     run_program_assert_revert(program);
 }
 
 #[test]
 fn push_push_add() {
-    let (a, b) = (11, 31);
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Add,
     ];
-    run_program_assert_result(program, a + b);
+    run_program_assert_result(program, (a + b).try_into().unwrap());
 }
 
 #[test]
@@ -81,17 +91,46 @@ fn add_with_stack_underflow() {
 }
 
 #[test]
+fn push_push_normal_mul() {
+    let (a, b) = (BigUint::from(2_u8), BigUint::from(42_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, (a * b).try_into().unwrap());
+}
+
+#[test]
+fn mul_wraps_result() {
+    let a = BigUint::from_bytes_be(&[0xFF; 32]);
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, 254);
+}
+
+#[test]
+fn mul_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mul]);
+}
+
+#[test]
 fn push_push_pop() {
     // Push two values to the stack and then pop once
     // The program result should be equal to the first
     // pushed value
-    let (a, b) = (1, 2);
+    let (a, b) = (BigUint::from(1_u8), BigUint::from(2_u8));
+
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b),
         Operation::Pop,
     ];
-    run_program_assert_result(program, a);
+    run_program_assert_result(program, a.try_into().unwrap());
 }
 
 #[test]
@@ -103,13 +142,14 @@ fn pop_with_stack_underflow() {
 
 #[test]
 fn push_push_sar() {
-    let (value, shift) = (2, 1);
+    let (value, shift) = (BigUint::from(2_u8), BigUint::from(1_u8));
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(value)),
-        Operation::Push32(new_32_byte_immediate(shift)),
+        Operation::Push(value),
+        Operation::Push(shift.clone()),
         Operation::Sar,
     ];
-    let expected_result = value >> shift;
+    let expected_result = 2 >> 1;
+    //let expected_result: u8 = value.into() >> shift.into();
     run_program_assert_result(program, expected_result);
 }
 
@@ -138,12 +178,25 @@ fn sar_with_negative_value_preserves_sign() {
 
     let mut value: [u8; 32] = [0; 32];
     value[0] = 0b10000000;
-    let shift = 255;
+    let value = BigUint::from_bytes_be(&value);
+    
+    let shift: u8 = 255;
     let program = vec![
-        Operation::Push32(value),
-        Operation::Push32(new_32_byte_immediate(shift)),
+        Operation::Push(value),
+        Operation::Push(BigUint::from(shift)),
         Operation::Sar,
     ];
     let expected_result = 0b11111111;
     run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn jumpdest() {
+    let expected = 5;
+    let program = vec![
+        Operation::Jumpdest { pc: 0 },
+        Operation::Push(BigUint::from(expected)),
+        Operation::Jumpdest { pc: 34 },
+    ];
+    run_program_assert_result(program, expected)
 }
