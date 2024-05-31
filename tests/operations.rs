@@ -142,14 +142,13 @@ fn pop_with_stack_underflow() {
 
 #[test]
 fn push_push_sar() {
-    let (value, shift) = (BigUint::from(2_u8), BigUint::from(1_u8));
+    let (value, shift) = (2_u8, 1_u8);
     let program = vec![
-        Operation::Push(value),
-        Operation::Push(shift.clone()),
+        Operation::Push(BigUint::from(value)),
+        Operation::Push(BigUint::from(shift)),
         Operation::Sar,
     ];
-    let expected_result = 2 >> 1;
-    //let expected_result: u8 = value.into() >> shift.into();
+    let expected_result = value >> shift;
     run_program_assert_result(program, expected_result);
 }
 

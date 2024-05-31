@@ -189,16 +189,13 @@ fn codegen_sar<'c, 'r>(
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
-
     let ok_block = region.append_block(Block::new(&[]));
 
     start_block.append_operation(cf::cond_br(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
@@ -217,11 +214,6 @@ fn codegen_sar<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
-// fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
-//     let str_value = BigUint::from_bytes_be(&value).to_string();
-//     // TODO: should we handle this error?
-//     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
-// }
 fn codegen_jumpdest<'c>(
     op_ctx: &mut OperationCtx<'c>,
     region: &'c Region<'c>,
