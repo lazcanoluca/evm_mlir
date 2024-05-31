@@ -10,7 +10,7 @@ use crate::{
     program::Operation,
     utils::{
         check_stack_has_at_least, check_stack_has_space_for, generate_revert_block, stack_pop,
-        stack_push,
+        stack_push, swap_stack_elements,
     },
 };
 
@@ -27,7 +27,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Pop => codegen_pop(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
-        Operation::Swap(x) => todo!(),
+        Operation::Swap(x) => codegen_swap(op_ctx, region, x),
     }
 }
 
@@ -65,6 +65,38 @@ fn codegen_push<'c, 'r>(
         .into();
 
     stack_push(context, &ok_block, constant_value)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_swap<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+    nth: u32,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, nth)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(generate_revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    swap_stack_elements(context, &ok_block, 1, nth)?;
 
     Ok((start_block, ok_block))
 }
