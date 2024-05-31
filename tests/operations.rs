@@ -124,8 +124,6 @@ fn sub_add_wrapping() {
         Operation::Sub,
     ];
 
-    
-
     run_program_assert_result(program, 1);
 }
 

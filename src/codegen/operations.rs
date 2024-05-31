@@ -27,7 +27,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Sub => codegen_sub(op_ctx, region),
         Operation::Mul => codegen_mul(op_ctx, region),
         Operation::Pop => codegen_pop(op_ctx, region),
-        Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc)
+        Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
     }
 }
 
