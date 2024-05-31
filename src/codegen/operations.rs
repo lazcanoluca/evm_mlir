@@ -1,9 +1,6 @@
 use melior::{
     dialect::{arith, cf},
-    ir::{
-        attribute::IntegerAttribute, r#type::IntegerType, Attribute, Block, BlockRef, Location,
-        Region,
-    },
+    ir::{Attribute, Block, BlockRef, Location, Region},
     Context as MeliorContext,
 };
 
@@ -448,12 +445,10 @@ fn codegen_pc<'c>(
         location,
     ));
 
-    let uint256 = IntegerType::new(context, 256);
-
     let pc_value = ok_block
         .append_operation(arith::constant(
             context,
-            IntegerAttribute::new(uint256.into(), pc as i64).into(),
+            integer_constant_from_i64(context, pc as i64).into(),
             location,
         ))
         .result(0)?
