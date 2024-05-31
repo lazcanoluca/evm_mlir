@@ -179,7 +179,7 @@ fn sar_with_negative_value_preserves_sign() {
     let mut value: [u8; 32] = [0; 32];
     value[0] = 0b10000000;
     let value = BigUint::from_bytes_be(&value);
-    
+
     let shift: u8 = 255;
     let program = vec![
         Operation::Push(value),
