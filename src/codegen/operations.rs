@@ -31,7 +31,6 @@ pub fn generate_code_for_op<'c>(
     }
 }
 
-// TODO: use const generics to generalize for pushN
 fn codegen_push<'c, 'r>(
     op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
