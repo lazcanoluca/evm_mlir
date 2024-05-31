@@ -150,3 +150,24 @@ fn jumpdest() {
     ];
     run_program_assert_result(program, expected)
 }
+
+#[ignore]
+#[test]
+fn pc_with_previous_push() {
+    let pc = 33;
+    let program = vec![
+        Operation::Push(BigUint::from(8_u8)), //
+        Operation::PC { pc },                 //
+    ];
+    run_program_assert_result(program, pc as u8)
+}
+
+#[ignore]
+#[test]
+fn pc_with_no_previous_operation() {
+    let pc = 0;
+    let program = vec![
+        Operation::PC { pc }, //
+    ];
+    run_program_assert_result(program, pc as u8)
+}
