@@ -123,7 +123,7 @@ fn push_push_xor() {
     let program = vec![
         Operation::Push(BigUint::from(10_u8)),
         Operation::Push(BigUint::from(5_u8)),
-        Operation::Xor
+        Operation::Xor,
     ];
 
     run_program_assert_result(program, 15);
