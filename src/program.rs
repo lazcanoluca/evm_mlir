@@ -7,6 +7,8 @@ pub enum Opcode {
     MUL = 0x02,
     SUB = 0x03,
     // DIV = 0x04,
+    // SUB = 0x03,
+    DIV = 0x04,
     // SDIV = 0x05,
     // MOD = 0x06,
     // SMOD = 0x07,
@@ -27,7 +29,7 @@ pub enum Opcode {
     // OR = 0x17,
     // XOR = 0x18,
     // NOT = 0x19,
-    // BYTE = 0x1A,
+    BYTE = 0x1A,
     // SHL = 0x1B,
     // SHR = 0x1C,
     // SAR = 0x1D,
@@ -169,6 +171,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::MUL as u8 => Opcode::MUL,
             x if x == Opcode::POP as u8 => Opcode::POP,
+            x if x == Opcode::DIV as u8 => Opcode::DIV,
             x if x == Opcode::JUMPDEST as u8 => Opcode::JUMPDEST,
             x if x == Opcode::PUSH0 as u8 => Opcode::PUSH0,
             x if x == Opcode::PUSH1 as u8 => Opcode::PUSH1,
@@ -203,6 +206,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH30 as u8 => Opcode::PUSH30,
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
+            x if x == Opcode::BYTE as u8 => Opcode::BYTE,
             _ => Opcode::UNUSED,
         }
     }
@@ -214,8 +218,10 @@ pub enum Operation {
     Sub,
     Mul,
     Pop,
+    Div,
     Jumpdest { pc: usize },
     Push(BigUint),
+    Byte,
 }
 
 #[derive(Debug, Clone)]
@@ -237,6 +243,7 @@ impl Program {
                 Opcode::SUB => Operation::Sub,
                 Opcode::MUL => Operation::Mul,
                 Opcode::POP => Operation::Pop,
+                Opcode::DIV => Operation::Div,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
@@ -430,6 +437,7 @@ impl Program {
                     pc += 31;
                     Operation::Push(BigUint::from_bytes_be(x))
                 }
+                Opcode::BYTE => Operation::Byte,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
