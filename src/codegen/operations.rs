@@ -402,7 +402,8 @@ fn codegen_jump<'c, 'r: 'c>(
     // then it jumps to the block associated with that pc
     op_ctx.add_jump_op(ok_block, pc, location);
 
-    // TODO: improve this
+    // TODO: we are creating an empty block that won't ever be reached
+    // probably there's a better way to do this
     let empty_block = region.append_block(Block::new(&[]));
     Ok((start_block, empty_block))
 }
