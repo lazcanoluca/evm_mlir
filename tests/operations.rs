@@ -190,6 +190,23 @@ fn sar_with_negative_value_preserves_sign() {
 }
 
 #[test]
+fn sar_with_shift_out_of_bounds() {
+    // even if the shift is larger than 255 the SAR operation should
+    // work the same.
+
+    let value = BigUint::from_bytes_be(&[0xff; 32]);
+    let shift: usize = 1024;
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(shift)),
+        Operation::Sar,
+    ];
+    // in this case the expected result is 0xff because of the sign extension
+    let expected_result = 0xff;
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
 fn jumpdest() {
     let expected = 5;
     let program = vec![
