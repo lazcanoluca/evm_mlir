@@ -49,6 +49,7 @@ fn push_once() {
 #[test]
 fn push_twice() {
     let the_answer = BigUint::from(42_u8);
+
     let program = vec![
         Operation::Push(BigUint::from(1_u8)),
         Operation::Push(the_answer.clone()),
@@ -59,13 +60,14 @@ fn push_twice() {
 #[test]
 fn push_fill_stack() {
     let stack_top = BigUint::from(88_u8);
+
     // Push 1024 times
     let program = vec![Operation::Push(stack_top.clone()); 1024];
     run_program_assert_result(program, stack_top.try_into().unwrap());
 }
 
 #[test]
-fn push32_stack_overflow() {
+fn push_stack_overflow() {
     // Push 1025 times
     let program = vec![Operation::Push(BigUint::from(88_u8)); 1025];
     run_program_assert_revert(program);
@@ -84,65 +86,177 @@ fn push_push_add() {
 }
 
 #[test]
-fn dup1_once() {
+fn add_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Add]);
+}
+
+#[test]
+fn div_without_remainder() {
+    let (a, b) = (BigUint::from(20_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
     let program = vec![
-        Operation::Push(BigUint::from(10_u8)),
-        Operation::Push(BigUint::from(31_u8)),
-        Operation::Dup(1),
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_signed_division() {
+    // a = [1, 0, 0, 0, .... , 0, 0, 0, 0] == 1 << 255
+    let mut a = BigUint::from(0_u8);
+    a.set_bit(255, true);
+    // b = [0, 0, 1, 0, .... , 0, 0, 0, 0] == 1 << 253
+    let mut b = BigUint::from(0_u8);
+    b.set_bit(253, true);
+
+    //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
+    //If we take the lowest byte
+    //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,     //
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_remainder() {
+    let (a, b) = (BigUint::from(21_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_denominator() {
+    let (a, b) = (BigUint::from(5_u8), BigUint::from(0_u8));
+
+    let expected_result: u8 = 0_u8;
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_numerator() {
+    let (a, b) = (BigUint::from(0_u8), BigUint::from(10_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Div]);
+}
+
+#[test]
+fn push_push_normal_mul() {
+    let (a, b) = (BigUint::from(2_u8), BigUint::from(42_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, (a * b).try_into().unwrap());
+}
+
+#[test]
+fn mul_wraps_result() {
+    let a = BigUint::from_bytes_be(&[0xFF; 32]);
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, 254);
+}
+
+#[test]
+fn mul_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mul]);
+}
+
+#[test]
+fn push_push_pop() {
+    // Push two values to the stack and then pop once
+    // The program result should be equal to the first
+    // pushed value
+    let (a, b) = (BigUint::from(1_u8), BigUint::from(2_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b),
         Operation::Pop,
     ];
-
-    run_program_assert_result(program, 31);
+    run_program_assert_result(program, a.try_into().unwrap());
 }
 
 #[test]
-fn dup2_once() {
-    let program = vec![
-        Operation::Push(BigUint::from(4_u8)),
-        Operation::Push(BigUint::from(5_u8)),
-        Operation::Push(BigUint::from(6_u8)),
-        Operation::Dup(2),
-    ];
-
-    run_program_assert_result(program, 5);
-}
-
-#[test]
-fn dup_combined() {
-    let program = vec![
-        Operation::Push(BigUint::from(4_u8)),
-        Operation::Push(BigUint::from(5_u8)),
-        Operation::Push(BigUint::from(6_u8)),
-        Operation::Dup(2),
-        Operation::Dup(1),
-        Operation::Dup(5),
-        Operation::Dup(3),
-        Operation::Dup(4),
-        Operation::Dup(7),
-        Operation::Dup(6),
-        Operation::Dup(8),
-        Operation::Dup(9),
-        Operation::Dup(12),
-        Operation::Dup(11),
-        Operation::Dup(10),
-        Operation::Dup(13),
-        Operation::Dup(15),
-        Operation::Dup(14),
-        Operation::Dup(16),
-    ];
-
-    run_program_assert_result(program, 6);
-}
-
-#[test]
-fn dup_with_stack_underflow() {
-    let program = vec![Operation::Dup(1)];
+fn pop_with_stack_underflow() {
+    // Pop with an empty stack
+    let program = vec![Operation::Pop];
     run_program_assert_revert(program);
 }
 
 #[test]
-fn add_with_stack_underflow() {
-    run_program_assert_revert(vec![Operation::Add]);
+fn push_push_byte() {
+    let mut value: [u8; 32] = [0; 32];
+    let desired_byte = 0xff;
+    let offset: u8 = 16;
+    value[offset as usize] = desired_byte;
+    let value: BigUint = BigUint::from_bytes_be(&value);
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(offset)),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, desired_byte);
+}
+
+#[test]
+fn byte_with_stack_underflow() {
+    let program = vec![Operation::Byte];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn byte_with_offset_out_of_bounds() {
+    // must consider this case yet
+    let value: [u8; 32] = [0xff; 32];
+    let value: BigUint = BigUint::from_bytes_be(&value);
+    let offset = BigUint::from(32_u8);
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(offset),
+        Operation::Byte,
+    ];
+    run_program_assert_result(program, 0);
 }
 
 #[test]
