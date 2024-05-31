@@ -24,6 +24,7 @@ pub fn generate_code_for_op<'c>(
 ) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
     match op {
         Operation::Add => codegen_add(op_ctx, region),
+        Operation::Sub => codegen_sub(op_ctx, region),
         Operation::Mul => codegen_mul(op_ctx, region),
         Operation::Div => codegen_div(op_ctx, region),
         Operation::Mod => codegen_mod(op_ctx, region),
@@ -98,6 +99,45 @@ fn codegen_add<'c, 'r>(
 
     let result = ok_block
         .append_operation(arith::addi(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_sub<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(generate_revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::subi(lhs, rhs, location))
         .result(0)?
         .into();
 

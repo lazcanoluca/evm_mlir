@@ -5,7 +5,7 @@ pub enum Opcode {
     // STOP = 0x00,
     ADD = 0x01,
     MUL = 0x02,
-    // SUB = 0x03,
+    SUB = 0x03,
     DIV = 0x04,
     // SDIV = 0x05,
     MOD = 0x06,
@@ -215,6 +215,7 @@ impl From<u8> for Opcode {
 #[derive(Debug, Clone)]
 pub enum Operation {
     Add,
+    Sub,
     Mul,
     Addmod,
     Pop,
@@ -241,6 +242,7 @@ impl Program {
             };
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
+                Opcode::SUB => Operation::Sub,
                 Opcode::MUL => Operation::Mul,
                 Opcode::POP => Operation::Pop,
                 Opcode::DIV => Operation::Div,
