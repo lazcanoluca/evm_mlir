@@ -5,45 +5,47 @@ use melior::{
 };
 use num_bigint::BigUint;
 
-use super::context::CodegenCtx;
+use super::context::OperationCtx;
 use crate::{
     errors::CodegenError,
-    opcodes::Operation,
+    program::Operation,
     utils::{
-        check_stack_has_at_least, check_stack_has_space_for, revert_block, stack_pop, stack_push,
+        check_stack_has_at_least, check_stack_has_space_for, generate_revert_block, stack_pop,
+        stack_push,
     },
 };
 
 /// Generates blocks for target [`Operation`].
 /// Returns both the starting block, and the unterminated last block of the generated code.
-pub fn generate_code_for_op<'c, 'r>(
-    context: CodegenCtx<'c>,
-    region: &'r Region<'c>,
+pub fn generate_code_for_op<'c>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'c Region<'c>,
     op: Operation,
-) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
     match op {
-        Operation::Push32(x) => codegen_push(context, region, x),
-        Operation::Add => codegen_add(context, region),
-        Operation::Pop => codegen_pop(context, region),
-        Operation::Byte => codegen_byte(context, region),
+        Operation::Add => codegen_add(op_ctx, region),
+        Operation::Mul => codegen_mul(op_ctx, region),
+        Operation::Pop => codegen_pop(op_ctx, region),
+        Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
+        Operation::Push(x) => codegen_push(op_ctx, region, x),
+        Operation::Byte => codegen_byte(op_ctx, region),
     }
 }
 
-// TODO: use const generics to generalize for pushN
 fn codegen_push<'c, 'r>(
-    codegen_ctx: CodegenCtx<'c>,
+    op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
-    value_to_push: [u8; 32],
+    value_to_push: BigUint,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
-    let context = &codegen_ctx.mlir_context;
+    let context = &op_ctx.mlir_context;
     let location = Location::unknown(context);
 
     // Check there's enough space in stack
     let flag = check_stack_has_space_for(context, &start_block, 1)?;
 
     // Create REVERT block
-    let revert_block = region.append_block(revert_block(context)?);
+    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -57,12 +59,9 @@ fn codegen_push<'c, 'r>(
         location,
     ));
 
+    let constant_value = Attribute::parse(context, &format!("{} : i256", value_to_push)).unwrap();
     let constant_value = ok_block
-        .append_operation(arith::constant(
-            context,
-            integer_constant(context, value_to_push),
-            location,
-        ))
+        .append_operation(arith::constant(context, constant_value, location))
         .result(0)?
         .into();
 
@@ -72,18 +71,18 @@ fn codegen_push<'c, 'r>(
 }
 
 fn codegen_add<'c, 'r>(
-    codegen_ctx: CodegenCtx<'c>,
+    op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
-    let context = &codegen_ctx.mlir_context;
+    let context = &op_ctx.mlir_context;
     let location = Location::unknown(context);
 
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
     // Create REVERT block
-    let revert_block = region.append_block(revert_block(context)?);
+    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -110,8 +109,47 @@ fn codegen_add<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
+fn codegen_mul<'c, 'r>(
+    codegen_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &codegen_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    // Create REVERT block
+    let revert_block = region.append_block(generate_revert_block(context)?);
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::muli(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
 fn codegen_pop<'c, 'r>(
-    codegen_ctx: CodegenCtx<'c>,
+    codegen_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
@@ -122,7 +160,7 @@ fn codegen_pop<'c, 'r>(
     let flag = check_stack_has_at_least(context, &start_block, 1)?;
 
     // Create REVERT block
-    let revert_block = region.append_block(revert_block(context)?);
+    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -142,18 +180,18 @@ fn codegen_pop<'c, 'r>(
 }
 
 fn codegen_byte<'c, 'r>(
-    codegen_ctx: CodegenCtx<'c>,
+    op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
-    let context = &codegen_ctx.mlir_context;
+    let context = &op_ctx.mlir_context;
     let location = Location::unknown(context);
 
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
     // Create REVERT block
-    let revert_block = region.append_block(revert_block(context)?);
+    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -308,4 +346,17 @@ fn integer_constant(context: &MeliorContext, value: [u8; 32]) -> Attribute {
     let str_value = BigUint::from_bytes_be(&value).to_string();
     // TODO: should we handle this error?
     Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
+}
+
+fn codegen_jumpdest<'c>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'c Region<'c>,
+    pc: usize,
+) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
+    let landing_block = region.append_block(Block::new(&[]));
+
+    // Register jumpdest block in context
+    op_ctx.register_jump_destination(pc, landing_block);
+
+    Ok((landing_block, landing_block))
 }
