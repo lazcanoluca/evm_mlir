@@ -256,16 +256,13 @@ fn codegen_byte<'c, 'r>(
 
     // compare  offset > max_shift?
     let is_offset_out_of_bounds = ok_block
-        .append_operation(
-            arith::cmpi(
-                context,
-                arith::CmpiPredicate::Ugt,
-                offset,
-                constant_max_shift_in_bytes,
-                location,
-            )
-            .into(),
-        )
+        .append_operation(arith::cmpi(
+            context,
+            arith::CmpiPredicate::Ugt,
+            offset,
+            constant_max_shift_in_bytes,
+            location,
+        ))
         .result(0)?
         .into();
 
