@@ -144,9 +144,9 @@ fn pop_with_stack_underflow() {
 fn push_push_byte() {
     let mut value: [u8; 32] = [0; 32];
     let desired_byte = 0xff;
-    value[16] = desired_byte;
-    let value: BigUint = BigUint::from_bytes_be(&value);
     let offset: u8 = 16;
+    value[offset as usize] = desired_byte;
+    let value: BigUint = BigUint::from_bytes_be(&value);
     let program = vec![
         Operation::Push(value),
         Operation::Push(BigUint::from(offset)),
