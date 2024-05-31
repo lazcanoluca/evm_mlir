@@ -1,12 +1,18 @@
-use evm_mlir::{compile_binary, constants::REVERT_EXIT_CODE, opcodes::Operation};
+use evm_mlir::{
+    compile_binary,
+    constants::REVERT_EXIT_CODE,
+    program::{Operation, Program},
+};
+use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
-fn run_program_assert_result(program: Vec<Operation>, expected_result: u8) {
+fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
+    let program = Program::from(operations);
     let output_file = NamedTempFile::new()
         .expect("failed to generate tempfile")
         .into_temp_path();
 
-    compile_binary(program, &output_file).expect("failed to compile program");
+    compile_binary(&program, &output_file).expect("failed to compile program");
 
     assert!(output_file.exists(), "output file does not exist");
 
@@ -23,64 +29,60 @@ fn run_program_assert_revert(program: Vec<Operation>) {
     run_program_assert_result(program, REVERT_EXIT_CODE);
 }
 
-fn new_32_byte_immediate(value: u8) -> [u8; 32] {
-    let mut arr = [0; 32];
-    arr[31] = value;
-    arr
-}
+#[test]
+fn push_once() {
+    let value = BigUint::from(5_u8);
 
-fn new_32_byte_by_lshift(byte_value: u8, byte_lshift: u8) -> [u8; 32] {
-    assert!(byte_lshift < 32);
-    let mut arr = [0; 32];
-    let idx = 31 - byte_lshift;
-    arr[idx as usize] = byte_value;
-    arr
+    // For PUSH0
+    let program = vec![Operation::Push(BigUint::ZERO)];
+    run_program_assert_result(program, 0);
+
+    // For PUSH1, ... , PUSH32
+    for i in 0..32 {
+        let shifted_value: BigUint = value.clone() << (i * 8);
+        let program = vec![Operation::Push(shifted_value.clone())];
+        let expected_result: u8 = (shifted_value % 256_u32).try_into().unwrap();
+        run_program_assert_result(program, expected_result);
+    }
 }
 
 #[test]
-fn push32_once() {
-    let the_answer = 42;
-    let program = vec![Operation::Push32([the_answer; 32])];
-    run_program_assert_result(program, the_answer);
-}
+fn push_twice() {
+    let the_answer = BigUint::from(42_u8);
 
-#[test]
-fn push32_twice() {
-    let the_answer = 42;
     let program = vec![
-        Operation::Push32([0; 32]),
-        Operation::Push32([the_answer; 32]),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(the_answer.clone()),
     ];
-    run_program_assert_result(program, the_answer);
+    run_program_assert_result(program, the_answer.try_into().unwrap());
 }
 
 #[test]
-fn push32_fill_stack() {
-    let stack_top = 88;
+fn push_fill_stack() {
+    let stack_top = BigUint::from(88_u8);
+
     // Push 1024 times
-    let program = vec![Operation::Push32([stack_top; 32]); 1024];
-
-    run_program_assert_result(program, stack_top);
+    let program = vec![Operation::Push(stack_top.clone()); 1024];
+    run_program_assert_result(program, stack_top.try_into().unwrap());
 }
 
 #[test]
-fn push32_stack_overflow() {
+fn push_stack_overflow() {
     // Push 1025 times
-    let program = vec![Operation::Push32([88; 32]); 1025];
-
+    let program = vec![Operation::Push(BigUint::from(88_u8)); 1025];
     run_program_assert_revert(program);
 }
 
 #[test]
 fn push_push_add() {
-    let (a, b) = (11, 31);
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(a)),
-        Operation::Push32(new_32_byte_immediate(b)),
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
         Operation::Add,
     ];
-    run_program_assert_result(program, a + b);
+    run_program_assert_result(program, (a + b).try_into().unwrap());
 }
 
 #[test]
@@ -90,13 +92,13 @@ fn add_with_stack_underflow() {
 
 #[test]
 fn div_without_remainder() {
-    let (a, b) = (20, 5);
+    let (a, b) = (BigUint::from(20_u8), BigUint::from(5_u8));
 
     let expected_result = 4;
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(b)),
-        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push(b), //
+        Operation::Push(a), //
         Operation::Div,
     ];
 
@@ -106,31 +108,34 @@ fn div_without_remainder() {
 #[test]
 fn div_signed_division() {
     // a = [1, 0, 0, 0, .... , 0, 0, 0, 0] == 1 << 255
-    let a = new_32_byte_by_lshift(0x80, 31);
+    let mut a = BigUint::from(0_u8);
+    a.set_bit(255, true);
     // b = [0, 0, 1, 0, .... , 0, 0, 0, 0] == 1 << 253
-    let b = new_32_byte_by_lshift(0x20, 31);
+    let mut b = BigUint::from(0_u8);
+    b.set_bit(253, true);
+
     //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
     //If we take the lowest byte
     //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
     let expected_result: u8 = 4;
 
     let program = vec![
-        Operation::Push32(b), //
-        Operation::Push32(a), //
-        Operation::Div,       //
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,     //
     ];
     run_program_assert_result(program, expected_result);
 }
 
 #[test]
 fn div_with_remainder() {
-    let (a, b) = (21, 5);
+    let (a, b) = (BigUint::from(21_u8), BigUint::from(5_u8));
 
     let expected_result = 4;
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(b)),
-        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push(b), //
+        Operation::Push(a), //
         Operation::Div,
     ];
     run_program_assert_result(program, expected_result);
@@ -138,13 +143,13 @@ fn div_with_remainder() {
 
 #[test]
 fn div_with_zero_denominator() {
-    let (a, b) = (5, 0);
+    let (a, b) = (BigUint::from(5_u8), BigUint::from(0_u8));
 
     let expected_result = 0;
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(b)),
-        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push(b), //
+        Operation::Push(a), //
         Operation::Div,
     ];
     run_program_assert_result(program, expected_result);
@@ -152,13 +157,13 @@ fn div_with_zero_denominator() {
 
 #[test]
 fn div_with_zero_numerator() {
-    let (a, b) = (0, 10);
+    let (a, b) = (BigUint::from(0_u8), BigUint::from(10_u8));
 
     let expected_result = 0;
 
     let program = vec![
-        Operation::Push32(new_32_byte_immediate(b)),
-        Operation::Push32(new_32_byte_immediate(a)),
+        Operation::Push(b), //
+        Operation::Push(a), //
         Operation::Div,
     ];
     run_program_assert_result(program, expected_result);
@@ -167,4 +172,65 @@ fn div_with_zero_numerator() {
 #[test]
 fn div_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Div]);
+}
+
+#[test]
+fn push_push_normal_mul() {
+    let (a, b) = (BigUint::from(2_u8), BigUint::from(42_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, (a * b).try_into().unwrap());
+}
+
+#[test]
+fn mul_wraps_result() {
+    let a = BigUint::from_bytes_be(&[0xFF; 32]);
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Mul,
+    ];
+    run_program_assert_result(program, 254);
+}
+
+#[test]
+fn mul_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mul]);
+}
+
+#[test]
+fn push_push_pop() {
+    // Push two values to the stack and then pop once
+    // The program result should be equal to the first
+    // pushed value
+    let (a, b) = (BigUint::from(1_u8), BigUint::from(2_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b),
+        Operation::Pop,
+    ];
+    run_program_assert_result(program, a.try_into().unwrap());
+}
+
+#[test]
+fn pop_with_stack_underflow() {
+    // Pop with an empty stack
+    let program = vec![Operation::Pop];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn jumpdest() {
+    let expected = 5;
+    let program = vec![
+        Operation::Jumpdest { pc: 0 },
+        Operation::Push(BigUint::from(expected)),
+        Operation::Jumpdest { pc: 34 },
+    ];
+    run_program_assert_result(program, expected)
 }

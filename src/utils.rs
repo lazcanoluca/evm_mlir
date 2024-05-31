@@ -7,12 +7,10 @@ use melior::{
     ir::{
         attribute::{DenseI32ArrayAttribute, IntegerAttribute},
         r#type::IntegerType,
-        Attribute, Block, Location, Value,
+        Block, Location, Value,
     },
     Context as MeliorContext,
 };
-
-use num_bigint::BigUint;
 
 use crate::{
     constants::{MAX_STACK_SIZE, REVERT_EXIT_CODE, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL},
@@ -326,7 +324,7 @@ pub fn check_stack_has_at_least<'ctx>(
     Ok(flag.into())
 }
 
-pub fn revert_block(context: &MeliorContext) -> Result<Block, CodegenError> {
+pub fn generate_revert_block(context: &MeliorContext) -> Result<Block, CodegenError> {
     // TODO: create only one revert block and use it for all revert operations
     let location = Location::unknown(context);
     let uint8 = IntegerType::new(context, 8);
@@ -379,12 +377,6 @@ pub fn check_denominator_is_zero<'ctx>(
         .result(0)?;
 
     Ok(flag.into())
-}
-
-pub fn integer_constant_from_bytes(context: &MeliorContext, value: [u8; 32]) -> Attribute {
-    let str_value = BigUint::from_bytes_be(&value).to_string();
-    // TODO: should we handle this error?
-    Attribute::parse(context, &format!("{str_value} : i256")).unwrap()
 }
 
 pub fn integer_constant_from_i64(context: &MeliorContext, value: i64) -> IntegerAttribute {
