@@ -74,6 +74,63 @@ fn push_stack_overflow() {
 }
 
 #[test]
+fn dup1_once() {
+    let program = vec![
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Push(BigUint::from(31_u8)),
+        Operation::Dup(1),
+        Operation::Pop,
+    ];
+
+    run_program_assert_result(program, 31);
+}
+
+#[test]
+fn dup2_once() {
+    let program = vec![
+        Operation::Push(BigUint::from(4_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Push(BigUint::from(6_u8)),
+        Operation::Dup(2),
+    ];
+
+    run_program_assert_result(program, 5);
+}
+
+#[test]
+fn dup_combined() {
+    let program = vec![
+        Operation::Push(BigUint::from(4_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Push(BigUint::from(6_u8)),
+        Operation::Dup(2),
+        Operation::Dup(1),
+        Operation::Dup(5),
+        Operation::Dup(3),
+        Operation::Dup(4),
+        Operation::Dup(7),
+        Operation::Dup(6),
+        Operation::Dup(8),
+        Operation::Dup(9),
+        Operation::Dup(12),
+        Operation::Dup(11),
+        Operation::Dup(10),
+        Operation::Dup(13),
+        Operation::Dup(15),
+        Operation::Dup(14),
+        Operation::Dup(16),
+    ];
+
+    run_program_assert_result(program, 6);
+}
+
+#[test]
+fn dup_with_stack_underflow() {
+    let program = vec![Operation::Dup(1)];
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn push_push_add() {
     let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
 
