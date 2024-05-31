@@ -311,3 +311,75 @@ fn jumpdest() {
     ];
     run_program_assert_result(program, expected)
 }
+
+#[test]
+fn mod_with_non_zero_result() {
+    let (num, den) = (BigUint::from(31_u8), BigUint::from(10_u8));
+    let expected_result = (&num % &den).try_into().unwrap();
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn mod_with_result_zero() {
+    let (num, den) = (BigUint::from(10_u8), BigUint::from(2_u8));
+    let expected_result = (&num % &den).try_into().unwrap();
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn mod_with_zero_denominator() {
+    let (num, den) = (BigUint::from(10_u8), BigUint::from(0_u8));
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn mod_with_zero_numerator() {
+    let (num, den) = (BigUint::from(0_u8), BigUint::from(25_u8));
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn mod_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mod]);
+}
+
+#[test]
+fn addmod_with_non_zero_result() {
+    let (a, b, den) = (
+        BigUint::from(13_u8),
+        BigUint::from(30_u8),
+        BigUint::from(10_u8),
+    );
+
+    let program = vec![
+        Operation::Push(den.clone()),
+        Operation::Push(b.clone()),
+        Operation::Push(a.clone()),
+        Operation::Addmod,
+    ];
+    run_program_assert_result(program, ((a + b) % den).try_into().unwrap());
+}
+
+#[test]
+fn addmod_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Addmod]);
+}
+
+#[test]
+fn addmod_with_zero_denominator() {
+    let program = vec![
+        Operation::Push(BigUint::from(0_u8)),
+        Operation::Push(BigUint::from(31_u8)),
+        Operation::Push(BigUint::from(11_u8)),
+        Operation::Addmod,
+    ];
+    run_program_assert_result(program, 0);
+}
