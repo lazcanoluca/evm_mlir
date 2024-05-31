@@ -119,6 +119,23 @@ fn mul_with_stack_underflow() {
 }
 
 #[test]
+fn push_push_xor() {
+    let program = vec![
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Xor
+    ];
+
+    run_program_assert_result(program, 15);
+}
+
+#[test]
+fn xor_with_stack_underflow() {
+    let program = vec![Operation::Xor];
+
+    run_program_assert_revert(program);
+}
+#[test]
 fn push_push_pop() {
     // Push two values to the stack and then pop once
     // The program result should be equal to the first
