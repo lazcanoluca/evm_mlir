@@ -179,7 +179,7 @@ pub enum Operation {
     Add,
     Sub,
     Mul,
-    Push32([u8; 32]),
+    Push([u8; 32]),
     Pop,
 }
 
@@ -211,3 +211,4 @@ impl Operation {
         operations
     }
 }
+
