@@ -302,6 +302,26 @@ fn codegen_sar<'c, 'r>(
     let shift = stack_pop(context, &ok_block)?;
     let value = stack_pop(context, &ok_block)?;
 
+    let mut max_shift: [u8; 32] = [0; 32];
+    max_shift[31] = 255;
+
+    // max_shift = 255
+    let max_shift = ok_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant(context, max_shift),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    // if shift > 255  then after applying the `shrsi` operation the result will be poisoned
+    // to avoid the poisoning we set shift = min(shift, 255)
+    let shift = ok_block
+        .append_operation(arith::minui(shift, max_shift, location))
+        .result(0)?
+        .into();
+
     let result = ok_block
         .append_operation(arith::shrsi(value, shift, location))
         .result(0)?
