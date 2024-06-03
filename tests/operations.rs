@@ -86,8 +86,134 @@ fn push_push_add() {
 }
 
 #[test]
+fn push_push_sub() {
+    let (a, b) = (BigUint::from(11_u8), BigUint::from(31_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sub,
+    ];
+    run_program_assert_result(program, 20);
+}
+
+#[test]
+fn substraction_wraps_the_result() {
+    let (a, b) = (BigUint::from(10_u8), BigUint::from(0_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sub,
+    ];
+
+    let result = 0_u8.wrapping_sub(10);
+
+    run_program_assert_result(program, result);
+}
+
+#[test]
+fn sub_add_wrapping() {
+    let a = (BigUint::from(1_u8) << 256) - 1_u8;
+
+    let program = vec![
+        Operation::Push(a),
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Add,
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Sub,
+    ];
+
+    run_program_assert_result(program, 1);
+}
+
+#[test]
 fn add_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Add]);
+}
+
+#[test]
+fn div_without_remainder() {
+    let (a, b) = (BigUint::from(20_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_signed_division() {
+    // a = [1, 0, 0, 0, .... , 0, 0, 0, 0] == 1 << 255
+    let mut a = BigUint::from(0_u8);
+    a.set_bit(255, true);
+    // b = [0, 0, 1, 0, .... , 0, 0, 0, 0] == 1 << 253
+    let mut b = BigUint::from(0_u8);
+    b.set_bit(253, true);
+
+    //r = a / b = [0, 0, 0, 0, ....., 0, 1, 0, 0] = 4 in decimal
+    //If we take the lowest byte
+    //r = [0, 0, 0, 0, 0, 1, 0, 0] = 4 in decimal
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,     //
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_remainder() {
+    let (a, b) = (BigUint::from(21_u8), BigUint::from(5_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_denominator() {
+    let (a, b) = (BigUint::from(5_u8), BigUint::from(0_u8));
+
+    let expected_result: u8 = 0_u8;
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_zero_numerator() {
+    let (a, b) = (BigUint::from(0_u8), BigUint::from(10_u8));
+
+    let expected_result = (&a / &b).try_into().unwrap();
+
+    let program = vec![
+        Operation::Push(b), //
+        Operation::Push(a), //
+        Operation::Div,
+    ];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn div_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Div]);
 }
 
 #[test]
@@ -118,6 +244,23 @@ fn mul_with_stack_underflow() {
     run_program_assert_revert(vec![Operation::Mul]);
 }
 
+#[test]
+fn push_push_xor() {
+    let program = vec![
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Xor,
+    ];
+
+    run_program_assert_result(program, 15);
+}
+
+#[test]
+fn xor_with_stack_underflow() {
+    let program = vec![Operation::Xor];
+
+    run_program_assert_revert(program);
+}
 #[test]
 fn push_push_pop() {
     // Push two values to the stack and then pop once
@@ -221,5 +364,208 @@ fn jump_reverts_if_pc_is_wrong() {
         Operation::Jump,
         Operation::Jumpdest { pc: 83 },
     ];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn test_and() {
+    let (a, b) = (BigUint::from(0b1010_u8), BigUint::from(0b1100_u8));
+    let expected_result = 0b1000_u8;
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::And];
+    run_program_assert_result(program, expected_result);
+}
+#[test]
+fn test_and_with_zero() {
+    let a = BigUint::from(0_u8);
+    let b = BigUint::from(0xFF_u8);
+    let expected_result = 0_u8;
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::And];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn and_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::And]);
+}
+
+#[test]
+fn mod_with_non_zero_result() {
+    let (num, den) = (BigUint::from(31_u8), BigUint::from(10_u8));
+    let expected_result = (&num % &den).try_into().unwrap();
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn mod_with_result_zero() {
+    let (num, den) = (BigUint::from(10_u8), BigUint::from(2_u8));
+    let expected_result = (&num % &den).try_into().unwrap();
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn mod_with_zero_denominator() {
+    let (num, den) = (BigUint::from(10_u8), BigUint::from(0_u8));
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn mod_with_zero_numerator() {
+    let (num, den) = (BigUint::from(0_u8), BigUint::from(25_u8));
+
+    let program = vec![Operation::Push(den), Operation::Push(num), Operation::Mod];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn mod_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mod]);
+}
+
+#[test]
+fn addmod_with_non_zero_result() {
+    let (a, b, den) = (
+        BigUint::from(13_u8),
+        BigUint::from(30_u8),
+        BigUint::from(10_u8),
+    );
+
+    let program = vec![
+        Operation::Push(den.clone()),
+        Operation::Push(b.clone()),
+        Operation::Push(a.clone()),
+        Operation::Addmod,
+    ];
+    run_program_assert_result(program, ((a + b) % den).try_into().unwrap());
+}
+
+#[test]
+fn addmod_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Addmod]);
+}
+
+#[test]
+fn addmod_with_zero_denominator() {
+    let program = vec![
+        Operation::Push(BigUint::from(0_u8)),
+        Operation::Push(BigUint::from(31_u8)),
+        Operation::Push(BigUint::from(11_u8)),
+        Operation::Addmod,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_sgt_positive_greater_than() {
+    let a = BigUint::from(2_u8);
+    let b = BigUint::from(1_u8);
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sgt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_sgt_positive_less_than() {
+    let a = BigUint::from(0_u8);
+    let b = BigUint::from(2_u8);
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sgt,
+    ];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_sgt_signed_less_than() {
+    let mut a = BigUint::from(3_u8);
+    a.set_bit(255, true);
+    let b = BigUint::from(2_u8);
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sgt,
+    ];
+
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_sgt_signed_greater_than() {
+    let a = BigUint::from(2_u8);
+    let mut b = BigUint::from(3_u8);
+    b.set_bit(255, true);
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sgt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_sgt_equal() {
+    let a = BigUint::from(2_u8);
+    let b = BigUint::from(2_u8);
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Sgt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_sgt_stack_underflow() {
+    let program = vec![Operation::Sgt];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn test_lt_false() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Lt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_lt_true() {
+    let program = vec![
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Lt,
+    ];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_lt_equal() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Lt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_lt_stack_underflow() {
+    let program = vec![Operation::Lt];
     run_program_assert_revert(program);
 }

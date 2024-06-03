@@ -3,17 +3,17 @@ use melior::{
     ir::{Attribute, Block, BlockRef, Location, Region},
     Context as MeliorContext,
 };
-use num_bigint::BigUint;
 
 use super::context::OperationCtx;
 use crate::{
     errors::CodegenError,
     program::Operation,
     utils::{
-        check_stack_has_at_least, check_stack_has_space_for, generate_revert_block, stack_pop,
-        stack_push,
+        check_if_zero, check_stack_has_at_least, check_stack_has_space_for,
+        integer_constant_from_i64, stack_pop, stack_push,
     },
 };
+use num_bigint::BigUint;
 
 /// Generates blocks for target [`Operation`].
 /// Returns both the starting block, and the unterminated last block of the generated code.
@@ -23,14 +23,142 @@ pub fn generate_code_for_op<'c>(
     op: Operation,
 ) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
     match op {
+        Operation::Sgt => codegen_sgt(op_ctx, region),
         Operation::Add => codegen_add(op_ctx, region),
+        Operation::Sub => codegen_sub(op_ctx, region),
         Operation::Mul => codegen_mul(op_ctx, region),
+        Operation::Xor => codegen_xor(op_ctx, region),
+        Operation::Div => codegen_div(op_ctx, region),
+        Operation::Mod => codegen_mod(op_ctx, region),
+        Operation::Addmod => codegen_addmod(op_ctx, region),
         Operation::Pop => codegen_pop(op_ctx, region),
+        Operation::Lt => codegen_lt(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
         Operation::Jump => codegen_jump(op_ctx, region),
+        Operation::And => codegen_and(op_ctx, region),
     }
+}
+
+fn codegen_and<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::andi(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_lt<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::cmpi(
+            context,
+            arith::CmpiPredicate::Ult,
+            lhs,
+            rhs,
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_sgt<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::cmpi(
+            context,
+            arith::CmpiPredicate::Sgt,
+            lhs,
+            rhs,
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
 }
 
 fn codegen_push<'c, 'r>(
@@ -45,16 +173,13 @@ fn codegen_push<'c, 'r>(
     // Check there's enough space in stack
     let flag = check_stack_has_space_for(context, &start_block, 1)?;
 
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
-
     let ok_block = region.append_block(Block::new(&[]));
 
     start_block.append_operation(cf::cond_br(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
@@ -82,16 +207,13 @@ fn codegen_add<'c, 'r>(
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
-
     let ok_block = region.append_block(Block::new(&[]));
 
     start_block.append_operation(cf::cond_br(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
@@ -110,19 +232,16 @@ fn codegen_add<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
-fn codegen_mul<'c, 'r>(
-    codegen_ctx: &mut OperationCtx<'c>,
+fn codegen_sub<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
-    let context = &codegen_ctx.mlir_context;
+    let context = &op_ctx.mlir_context;
     let location = Location::unknown(context);
 
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
-
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -130,7 +249,110 @@ fn codegen_mul<'c, 'r>(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::subi(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_div<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let num = stack_pop(context, &ok_block)?;
+    let den = stack_pop(context, &ok_block)?;
+
+    let den_is_zero = check_if_zero(context, &ok_block, &den)?;
+    let den_zero_bloq = region.append_block(Block::new(&[]));
+    let den_not_zero_bloq = region.append_block(Block::new(&[]));
+    let return_block = region.append_block(Block::new(&[]));
+
+    let constant_value = den_zero_bloq
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, 0i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_zero_bloq, constant_value)?;
+
+    den_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    // Denominator is not zero path
+    let result = den_not_zero_bloq
+        .append_operation(arith::divui(num, den, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_not_zero_bloq, result)?;
+
+    den_not_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    ok_block.append_operation(cf::cond_br(
+        context,
+        den_is_zero,
+        &den_zero_bloq,
+        &den_not_zero_bloq,
+        &[],
+        &[],
+        location,
+    ));
+
+    Ok((start_block, return_block))
+}
+
+fn codegen_mul<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
@@ -149,19 +371,16 @@ fn codegen_mul<'c, 'r>(
     Ok((start_block, ok_block))
 }
 
-fn codegen_pop<'c, 'r>(
-    codegen_ctx: &mut OperationCtx<'c>,
+fn codegen_mod<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
-    let context = &codegen_ctx.mlir_context;
+    let context = &op_ctx.mlir_context;
     let location = Location::unknown(context);
 
-    // Check there's at least 1 element in stack
-    let flag = check_stack_has_at_least(context, &start_block, 1)?;
-
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
     let ok_block = region.append_block(Block::new(&[]));
 
@@ -169,7 +388,180 @@ fn codegen_pop<'c, 'r>(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let num = stack_pop(context, &ok_block)?;
+    let den = stack_pop(context, &ok_block)?;
+
+    let den_is_zero = check_if_zero(context, &ok_block, &den)?;
+    let den_zero_bloq = region.append_block(Block::new(&[]));
+    let den_not_zero_bloq = region.append_block(Block::new(&[]));
+    let return_block = region.append_block(Block::new(&[]));
+
+    let constant_value = den_zero_bloq
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, 0i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_zero_bloq, constant_value)?;
+
+    den_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    let mod_result = den_not_zero_bloq
+        .append_operation(arith::remui(num, den, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_not_zero_bloq, mod_result)?;
+
+    den_not_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    ok_block.append_operation(cf::cond_br(
+        context,
+        den_is_zero,
+        &den_zero_bloq,
+        &den_not_zero_bloq,
+        &[],
+        &[],
+        location,
+    ));
+
+    Ok((start_block, return_block))
+}
+
+fn codegen_addmod<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 3)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let a = stack_pop(context, &ok_block)?;
+    let b = stack_pop(context, &ok_block)?;
+    let den = stack_pop(context, &ok_block)?;
+
+    let den_is_zero = check_if_zero(context, &ok_block, &den)?;
+    let den_zero_bloq = region.append_block(Block::new(&[]));
+    let den_not_zero_bloq = region.append_block(Block::new(&[]));
+    let return_block = region.append_block(Block::new(&[]));
+
+    let constant_value = den_zero_bloq
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, 0i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_zero_bloq, constant_value)?;
+
+    den_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    let add_result = den_not_zero_bloq
+        .append_operation(arith::addi(a, b, location))
+        .result(0)?
+        .into();
+    let mod_result = den_not_zero_bloq
+        .append_operation(arith::remui(add_result, den, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &den_not_zero_bloq, mod_result)?;
+
+    den_not_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    ok_block.append_operation(cf::cond_br(
+        context,
+        den_is_zero,
+        &den_zero_bloq,
+        &den_not_zero_bloq,
+        &[],
+        &[],
+        location,
+    ));
+
+    Ok((start_block, return_block))
+}
+
+fn codegen_xor<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::xori(lhs, rhs, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_pop<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's at least 1 element in stack
+    let flag = check_stack_has_at_least(context, &start_block, 1)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
@@ -191,9 +583,6 @@ fn codegen_byte<'c, 'r>(
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, 2)?;
 
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
-
     let ok_block = region.append_block(Block::new(&[]));
 
     // in out_of_bounds_block a 0 is pushed to the stack
@@ -208,7 +597,7 @@ fn codegen_byte<'c, 'r>(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
