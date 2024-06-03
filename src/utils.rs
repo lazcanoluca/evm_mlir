@@ -5,7 +5,10 @@ use melior::{
         ods,
     },
     ir::{
-        attribute::{DenseI32ArrayAttribute, IntegerAttribute}, operation::OperationResult, r#type::IntegerType, Block, Location, Value
+        attribute::{DenseI32ArrayAttribute, IntegerAttribute},
+        operation::OperationResult,
+        r#type::IntegerType,
+        Block, Location, Value,
     },
     Context as MeliorContext,
 };
@@ -206,6 +209,42 @@ pub fn get_nth_from_stack<'ctx>(
     Ok((value, nth_stack_ptr))
 }
 
+pub fn swap_stack_elements<'ctx>(
+    context: &'ctx MeliorContext,
+    block: &'ctx Block,
+    position_1: u32,
+    position_2: u32,
+) -> Result<(), CodegenError> {
+    debug_assert!(position_1 < MAX_STACK_SIZE as u32);
+    debug_assert!(position_2 < MAX_STACK_SIZE as u32);
+    let location = Location::unknown(context);
+
+    let (first_element, first_elem_address) = get_nth_from_stack(context, block, position_1)?;
+    let (nth_element, nth_elem_address) = get_nth_from_stack(context, block, position_2)?;
+
+    // Store element in position 1 into position 2
+    let res = block.append_operation(llvm::store(
+        context,
+        first_element,
+        nth_elem_address.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+    assert!(res.verify());
+
+    // Store element in position 2 into position 1
+    let res = block.append_operation(llvm::store(
+        context,
+        nth_element,
+        first_elem_address.into(),
+        location,
+        LoadStoreOptions::default(),
+    ));
+    assert!(res.verify());
+
+    Ok(())
+}
+
 /// Generates code for checking if the stack has enough space for `element_count` more elements.
 pub fn check_stack_has_space_for<'ctx>(
     context: &'ctx MeliorContext,
@@ -397,10 +436,10 @@ pub fn generate_revert_block(context: &MeliorContext) -> Result<Block, CodegenEr
     Ok(revert_block)
 }
 
-pub fn check_denominator_is_zero<'ctx>(
+pub fn check_if_zero<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
-    denominator: &'ctx Value,
+    value: &'ctx Value,
 ) -> Result<Value<'ctx, 'ctx>, CodegenError> {
     let location = Location::unknown(context);
 
@@ -414,14 +453,14 @@ pub fn check_denominator_is_zero<'ctx>(
         .result(0)?
         .into();
 
-    //Perform the comparisson -> denominator == 0
+    //Perform the comparisson -> value == 0
     let flag = block
         .append_operation(
             ods::llvm::icmp(
                 context,
                 IntegerType::new(context, 1).into(),
                 zero_constant_value,
-                *denominator,
+                *value,
                 IntegerAttribute::new(
                     IntegerType::new(context, 64).into(),
                     /* "eq" predicate enum value */ 0,
