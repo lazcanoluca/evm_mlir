@@ -332,3 +332,20 @@ fn jumpi_reverts_if_pc_is_wrong() {
     ];
     run_program_assert_revert(program);
 }
+
+#[test]
+fn jumpi_does_not_revert_if_pc_is_wrong_but_branch_is_not_taken() {
+    // if the pc given does not correspond to a jump destination
+    // but the branch is not taken then the program should not revert
+    let pc = BigUint::from(7_u8);
+    let condition = BigUint::from(0_u8);
+    let a = 10_u8;
+    let program = vec![
+        Operation::Push(condition),
+        Operation::Push(pc),
+        Operation::Jumpi,
+        Operation::Push(BigUint::from(a)),
+        Operation::Jumpdest { pc: 83 },
+    ];
+    run_program_assert_result(program, a);
+}
