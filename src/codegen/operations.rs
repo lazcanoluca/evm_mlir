@@ -38,6 +38,8 @@ pub fn generate_code_for_op<'c>(
         Operation::Push(x) => codegen_push(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
         Operation::IsZero => codegen_iszero(op_ctx, region),
+        Operation::Jump => codegen_jump(op_ctx, region),
+        Operation::And => codegen_and(op_ctx, region),
     }
 }
 
@@ -106,9 +108,6 @@ fn codegen_iszero<'c, 'r>(
     ));
 
     Ok((start_block, return_block))
-        Operation::Jump => codegen_jump(op_ctx, region),
-        Operation::And => codegen_and(op_ctx, region),
-    }
 }
 
 fn codegen_and<'c, 'r>(
