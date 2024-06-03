@@ -447,27 +447,39 @@ fn codegen_jumpi<'c, 'r: 'c>(
 
     let pc = stack_pop(context, &ok_block)?;
     let condition = stack_pop(context, &ok_block)?;
-    // appends operation to ok_block to jump to the `jump table block``
-    // in the jump table block the pc is checked and if its ok
-    // then it jumps to the block associated with that pc
-    
-    //op_ctx.add_jump_op(ok_block, pc, location);
 
     let false_block = region.append_block(Block::new(&[]));
 
-    let op = ok_block.append_operation(cf::cond_br(
+    let zero = ok_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, 0i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    // compare  condition > 0  to convert condition from u256 to 1-bit signless integer
+    // TODO: change this maybe using arith::trunci
+    let condition = ok_block
+        .append_operation(arith::cmpi(
+            context,
+            arith::CmpiPredicate::Ugt,
+            condition,
+            zero,
+            location,
+        ))
+        .result(0)?;
+
+    ok_block.append_operation(cf::cond_br(
         context,
-        condition,
+        condition.into(),
         &op_ctx.jumptable_block,
         &false_block,
         &[pc],
         &[],
         location,
     ));
-    assert!(op.verify());
 
-    // TODO: we are creating an empty block that won't ever be reached
-    // probably there's a better way to do this
-    let empty_block = region.append_block(Block::new(&[]));
-    Ok((start_block, empty_block))
+    Ok((start_block, false_block))
 }
