@@ -340,10 +340,10 @@ pub fn generate_revert_block(context: &MeliorContext) -> Result<Block, CodegenEr
     Ok(revert_block)
 }
 
-pub fn check_denominator_is_zero<'ctx>(
+pub fn check_if_zero<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
-    denominator: &'ctx Value,
+    value: &'ctx Value,
 ) -> Result<Value<'ctx, 'ctx>, CodegenError> {
     let location = Location::unknown(context);
 
@@ -357,14 +357,14 @@ pub fn check_denominator_is_zero<'ctx>(
         .result(0)?
         .into();
 
-    //Perform the comparisson -> denominator == 0
+    //Perform the comparisson -> value == 0
     let flag = block
         .append_operation(
             ods::llvm::icmp(
                 context,
                 IntegerType::new(context, 1).into(),
                 zero_constant_value,
-                *denominator,
+                *value,
                 IntegerAttribute::new(
                     IntegerType::new(context, 64).into(),
                     /* "eq" predicate enum value */ 0,
