@@ -5,19 +5,18 @@ pub enum Opcode {
     // STOP = 0x00,
     ADD = 0x01,
     MUL = 0x02,
-    // SUB = 0x03,
-    // DIV = 0x04,
+    SUB = 0x03,
+    DIV = 0x04,
     // SDIV = 0x05,
-    // MOD = 0x06,
+    MOD = 0x06,
     // SMOD = 0x07,
-    // ADDMOD = 0x08,
+    ADDMOD = 0x08,
     // MULMOD = 0x09,
     // EXP = 0x0A,
     // SIGNEXTEND = 0x0B,
 
     // unused 0x0C-0x0F
-
-    // LT = 0x10,
+    LT = 0x10,
     // GT = 0x11,
     // SLT = 0x12,
     // SGT = 0x13,
@@ -27,7 +26,7 @@ pub enum Opcode {
     // OR = 0x17,
     XOR = 0x18,
     // NOT = 0x19,
-    // BYTE = 0x1A,
+    BYTE = 0x1A,
     // SHL = 0x1B,
     // SHR = 0x1C,
     // SAR = 0x1D,
@@ -170,7 +169,10 @@ impl From<u8> for Opcode {
             x if x == Opcode::MUL as u8 => Opcode::MUL,
             x if x == Opcode::XOR as u8 => Opcode::XOR,
             x if x == Opcode::POP as u8 => Opcode::POP,
+            x if x == Opcode::DIV as u8 => Opcode::DIV,
+            x if x == Opcode::MOD as u8 => Opcode::MOD,
             x if x == Opcode::JUMPDEST as u8 => Opcode::JUMPDEST,
+            x if x == Opcode::ADDMOD as u8 => Opcode::ADDMOD,
             x if x == Opcode::PUSH0 as u8 => Opcode::PUSH0,
             x if x == Opcode::PUSH1 as u8 => Opcode::PUSH1,
             x if x == Opcode::PUSH2 as u8 => Opcode::PUSH2,
@@ -204,6 +206,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::PUSH30 as u8 => Opcode::PUSH30,
             x if x == Opcode::PUSH31 as u8 => Opcode::PUSH31,
             x if x == Opcode::PUSH32 as u8 => Opcode::PUSH32,
+            x if x == Opcode::BYTE as u8 => Opcode::BYTE,
             _ => Opcode::UNUSED,
         }
     }
@@ -212,11 +215,17 @@ impl From<u8> for Opcode {
 #[derive(Debug, Clone)]
 pub enum Operation {
     Add,
+    Sub,
     Mul,
+    Addmod,
     Xor,
     Pop,
+    Lt,
+    Div,
+    Mod,
     Jumpdest { pc: usize },
     Push(BigUint),
+    Byte,
 }
 
 #[derive(Debug, Clone)]
@@ -235,10 +244,15 @@ impl Program {
             };
             let op = match Opcode::from(opcode) {
                 Opcode::ADD => Operation::Add,
+                Opcode::SUB => Operation::Sub,
                 Opcode::MUL => Operation::Mul,
                 Opcode::XOR => Operation::Xor,
+                Opcode::LT => Operation::Lt,
                 Opcode::POP => Operation::Pop,
+                Opcode::DIV => Operation::Div,
+                Opcode::MOD => Operation::Mod,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
+                Opcode::ADDMOD => Operation::Addmod,
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
                     pc += 1;
@@ -431,6 +445,7 @@ impl Program {
                     pc += 31;
                     Operation::Push(BigUint::from_bytes_be(x))
                 }
+                Opcode::BYTE => Operation::Byte,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
