@@ -97,31 +97,30 @@ fn dup2_once() {
     run_program_assert_result(program, 5);
 }
 
-#[test]
-fn dup_combined() {
-    let program = vec![
-        Operation::Push(BigUint::from(4_u8)),
-        Operation::Push(BigUint::from(5_u8)),
-        Operation::Push(BigUint::from(6_u8)),
-        Operation::Dup(2),
-        Operation::Dup(1),
-        Operation::Dup(5),
-        Operation::Dup(3),
-        Operation::Dup(4),
-        Operation::Dup(7),
-        Operation::Dup(6),
-        Operation::Dup(8),
-        Operation::Dup(9),
-        Operation::Dup(12),
-        Operation::Dup(11),
-        Operation::Dup(10),
-        Operation::Dup(13),
-        Operation::Dup(15),
-        Operation::Dup(14),
-        Operation::Dup(16),
-    ];
+#[rstest]
+#[case(1)]
+#[case(2)]
+#[case(3)]
+#[case(4)]
+#[case(5)]
+#[case(6)]
+#[case(7)]
+#[case(8)]
+#[case(9)]
+#[case(10)]
+#[case(11)]
+#[case(12)]
+#[case(13)]
+#[case(14)]
+#[case(15)]
+#[case(16)]
+fn dup_nth(#[case] nth: u8) {
+    let iter = (0..16u8).rev().map(|x| Operation::Push(BigUint::from(x)));
+    let mut program = Vec::from_iter(iter);
 
-    run_program_assert_result(program, 6);
+    program.push(Operation::Dup(nth.into()));
+
+    run_program_assert_result(program, nth - 1);
 }
 
 #[test]

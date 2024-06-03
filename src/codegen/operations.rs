@@ -76,6 +76,7 @@ fn codegen_dup<'c, 'r>(
     region: &'r Region<'c>,
     nth: u32,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    debug_assert!(nth > 0 && nth <= 16);
     let start_block = region.append_block(Block::new(&[]));
     let context = &op_ctx.mlir_context;
     let location = Location::unknown(context);
@@ -84,16 +85,13 @@ fn codegen_dup<'c, 'r>(
     // Check there's enough elements in stack
     let flag = check_stack_has_at_least(context, &start_block, nth)?;
 
-    // Create REVERT block
-    let revert_block = region.append_block(generate_revert_block(context)?);
-
     let ok_block = region.append_block(Block::new(&[]));
 
     start_block.append_operation(cf::cond_br(
         context,
         flag,
         &ok_block,
-        &revert_block,
+        &op_ctx.revert_block,
         &[],
         &[],
         location,
