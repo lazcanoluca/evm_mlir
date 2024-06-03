@@ -1,5 +1,5 @@
 use melior::{
-    dialect::{arith, cf},
+    dialect::{arith, cf, func},
     ir::{Attribute, Block, BlockRef, Location, Region},
     Context as MeliorContext,
 };
@@ -10,7 +10,8 @@ use crate::{
     program::Operation,
     utils::{
         check_if_zero, check_stack_has_at_least, check_stack_has_space_for,
-        integer_constant_from_i64, stack_pop, stack_push, swap_stack_elements,
+        integer_constant_from_i64, integer_constant_from_i8, stack_pop, stack_push,
+        swap_stack_elements,
     },
 };
 use num_bigint::BigUint;
@@ -936,8 +937,24 @@ fn codegen_pc<'c>(
 }
 
 fn codegen_stop<'c, 'r>(
-    _op_ctx: &mut OperationCtx<'c>,
-    _region: &'r Region<'c>,
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
-    todo!()
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    let zero = start_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i8(context, 0).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    start_block.append_operation(func::r#return(&[zero], location));
+    let empty_block = region.append_block(Block::new(&[]));
+
+    Ok((start_block, empty_block))
 }
