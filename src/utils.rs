@@ -5,9 +5,7 @@ use melior::{
         ods,
     },
     ir::{
-        attribute::{DenseI32ArrayAttribute, IntegerAttribute},
-        r#type::IntegerType,
-        Block, Location, Value,
+        attribute::{DenseI32ArrayAttribute, IntegerAttribute}, operation::OperationResult, r#type::IntegerType, Block, Location, Value
     },
     Context as MeliorContext,
 };
@@ -149,12 +147,12 @@ pub fn stack_push<'ctx>(
     Ok(())
 }
 
-// Returns a copy of the nth value of the stack
+// Returns a copy of the nth value of the stack along with its stack's address
 pub fn get_nth_from_stack<'ctx>(
     context: &'ctx MeliorContext,
     block: &'ctx Block,
     nth: u32,
-) -> Result<Value<'ctx, 'ctx>, CodegenError> {
+) -> Result<(Value<'ctx, 'ctx>, OperationResult<'ctx, 'ctx>), CodegenError> {
     debug_assert!(nth < MAX_STACK_SIZE as u32);
     let uint256 = IntegerType::new(context, 256);
     let location = Location::unknown(context);
@@ -182,7 +180,7 @@ pub fn get_nth_from_stack<'ctx>(
         .result(0)?;
 
     // Decrement stack pointer
-    let old_stack_ptr = block
+    let nth_stack_ptr = block
         .append_operation(llvm::get_element_ptr(
             context,
             stack_ptr.into(),
@@ -197,7 +195,7 @@ pub fn get_nth_from_stack<'ctx>(
     let value = block
         .append_operation(llvm::load(
             context,
-            old_stack_ptr.into(),
+            nth_stack_ptr.into(),
             uint256.into(),
             location,
             LoadStoreOptions::default(),
@@ -205,7 +203,7 @@ pub fn get_nth_from_stack<'ctx>(
         .result(0)?
         .into();
 
-    Ok(value)
+    Ok((value, nth_stack_ptr))
 }
 
 /// Generates code for checking if the stack has enough space for `element_count` more elements.

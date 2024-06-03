@@ -3,6 +3,7 @@ use evm_mlir::{
     constants::REVERT_EXIT_CODE,
     program::{Operation, Program},
 };
+use rstest::rstest;
 use num_bigint::BigUint;
 use tempfile::NamedTempFile;
 
