@@ -14,6 +14,7 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 <details>
 <summary>Implemented opcodes (click to open)</summary>
 
+1. (0x00) STOP
 1. (0x01) ADD
 1. (0x02) MUL
 1. (0x04) DIV
@@ -85,7 +86,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 <details>
 <summary>Not yet implemented opcodes (click to open)</summary>
 
-1. (0x00) STOP
 1. (0x03) SUB
 1. (0x05) SDIV
 1. (0x07) SMOD
