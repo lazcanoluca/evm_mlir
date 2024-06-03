@@ -808,3 +808,34 @@ fn test_lt_stack_underflow() {
     let program = vec![Operation::Lt];
     run_program_assert_revert(program);
 }
+
+#[test]
+fn push_push_exp() {
+    let (a, b) = (BigUint::from(2_u8), BigUint::from(3_u8));
+
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Exp,
+    ];
+
+    run_program_assert_result(program, (a.pow(b.try_into().unwrap())).try_into().unwrap());
+}
+
+#[test]
+fn exp_with_overflow_should_wrap() {
+    let a = BigUint::from(3_u8);
+    let b = BigUint::from(256_u16);
+    let program = vec![
+        Operation::Push(a.clone()),
+        Operation::Push(b.clone()),
+        Operation::Exp,
+    ];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn exp_with_stack_underflow() {
+    let program = vec![Operation::Exp];
+    run_program_assert_revert(program);
+}

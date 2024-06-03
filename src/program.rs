@@ -12,7 +12,7 @@ pub enum Opcode {
     // SMOD = 0x07,
     ADDMOD = 0x08,
     // MULMOD = 0x09,
-    // EXP = 0x0A,
+    EXP = 0x0A,
     // SIGNEXTEND = 0x0B,
 
     // unused 0x0C-0x0F
@@ -248,6 +248,7 @@ pub enum Operation {
     Div,
     IsZero,
     Mod,
+    Exp,
     Jumpdest { pc: usize },
     Push(BigUint),
     Dup(u32),
@@ -284,6 +285,7 @@ impl Program {
                 Opcode::DIV => Operation::Div,
                 Opcode::MOD => Operation::Mod,
                 Opcode::SGT => Operation::Sgt,
+                Opcode::EXP => Operation::Exp,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::JUMP => Operation::Jump,
                 Opcode::ADDMOD => Operation::Addmod,
