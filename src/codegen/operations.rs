@@ -9,7 +9,7 @@ use crate::{
     errors::CodegenError,
     program::Operation,
     utils::{
-        check_if_zero, check_stack_has_at_least, check_stack_has_space_for,
+        check_if_zero, check_stack_has_at_least, check_stack_has_space_for, get_nth_from_stack,
         integer_constant_from_i64, stack_pop, stack_push, swap_stack_elements,
     },
 };
@@ -36,6 +36,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Lt => codegen_lt(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
+        Operation::Dup(x) => codegen_dup(op_ctx, region, x),
         Operation::Swap(x) => codegen_swap(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
         Operation::Jumpi => codegen_jumpi(op_ctx, region),
@@ -263,6 +264,38 @@ fn codegen_push<'c, 'r>(
         .into();
 
     stack_push(context, &ok_block, constant_value)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_dup<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+    nth: u32,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    debug_assert!(nth > 0 && nth <= 16);
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, nth)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let (nth_value, _) = get_nth_from_stack(context, &ok_block, nth)?;
+
+    stack_push(context, &ok_block, nth_value)?;
 
     Ok((start_block, ok_block))
 }

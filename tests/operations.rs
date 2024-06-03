@@ -4,6 +4,7 @@ use evm_mlir::{
     program::{Operation, Program},
 };
 use num_bigint::BigUint;
+use rstest::rstest;
 use tempfile::NamedTempFile;
 
 fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
@@ -70,6 +71,63 @@ fn push_fill_stack() {
 fn push_stack_overflow() {
     // Push 1025 times
     let program = vec![Operation::Push(BigUint::from(88_u8)); 1025];
+    run_program_assert_revert(program);
+}
+
+#[test]
+fn dup1_once() {
+    let program = vec![
+        Operation::Push(BigUint::from(10_u8)),
+        Operation::Push(BigUint::from(31_u8)),
+        Operation::Dup(1),
+        Operation::Pop,
+    ];
+
+    run_program_assert_result(program, 31);
+}
+
+#[test]
+fn dup2_once() {
+    let program = vec![
+        Operation::Push(BigUint::from(4_u8)),
+        Operation::Push(BigUint::from(5_u8)),
+        Operation::Push(BigUint::from(6_u8)),
+        Operation::Dup(2),
+    ];
+
+    run_program_assert_result(program, 5);
+}
+
+#[rstest]
+#[case(1)]
+#[case(2)]
+#[case(3)]
+#[case(4)]
+#[case(5)]
+#[case(6)]
+#[case(7)]
+#[case(8)]
+#[case(9)]
+#[case(10)]
+#[case(11)]
+#[case(12)]
+#[case(13)]
+#[case(14)]
+#[case(15)]
+#[case(16)]
+fn dup_nth(#[case] nth: u8) {
+    let iter = (0..16u8).rev().map(|x| Operation::Push(BigUint::from(x)));
+    let mut program = Vec::from_iter(iter);
+
+    program.push(Operation::Dup(nth.into()));
+
+    run_program_assert_result(program, nth - 1);
+}
+
+#[test]
+fn dup_with_stack_underflow() {
+    let program = vec![Operation::Dup(1)];
+
     run_program_assert_revert(program);
 }
 
