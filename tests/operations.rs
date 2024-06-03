@@ -385,7 +385,7 @@ fn addmod_with_zero_denominator() {
 }
 
 #[test]
-fn test_sgt_unsigned_greater_than() {
+fn test_sgt_positive_greater_than() {
     let a = BigUint::from(2_u8);
     let b = BigUint::from(1_u8);
 
@@ -398,7 +398,7 @@ fn test_sgt_unsigned_greater_than() {
 }
 
 #[test]
-fn test_sgt_unsigned_less_than() {
+fn test_sgt_positive_less_than() {
     let a = BigUint::from(0_u8);
     let b = BigUint::from(2_u8);
 
