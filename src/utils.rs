@@ -480,9 +480,9 @@ pub fn integer_constant_from_i64(context: &MeliorContext, value: i64) -> Integer
     IntegerAttribute::new(uint256.into(), value)
 }
 
-pub fn integer_constant_from_i8(context: &MeliorContext, value: i64) -> IntegerAttribute {
+pub fn integer_constant_from_i8(context: &MeliorContext, value: i8) -> IntegerAttribute {
     let int8 = IntegerType::new(context, 8);
-    IntegerAttribute::new(int8.into(), value)
+    IntegerAttribute::new(int8.into(), value.into())
 }
 
 pub mod llvm_mlir {
