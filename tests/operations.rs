@@ -911,6 +911,13 @@ fn test_lt_stack_underflow() {
 }
 
 #[test]
+fn stop() {
+    // the push operation should not be executed
+    let program = vec![Operation::Stop, Operation::Push(BigUint::from(10_u8))];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
 fn push_push_exp() {
     let (a, b) = (BigUint::from(2_u8), BigUint::from(3_u8));
 

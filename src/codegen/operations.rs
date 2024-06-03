@@ -1,5 +1,5 @@
 use melior::{
-    dialect::{arith, cf, ods},
+    dialect::{arith, cf, func, ods},
     ir::{Attribute, Block, BlockRef, Location, Region},
     Context as MeliorContext,
 };
@@ -10,7 +10,8 @@ use crate::{
     program::Operation,
     utils::{
         check_if_zero, check_stack_has_at_least, check_stack_has_space_for, get_nth_from_stack,
-        integer_constant_from_i64, stack_pop, stack_push, swap_stack_elements,
+        integer_constant_from_i64, integer_constant_from_i8, stack_pop, stack_push,
+        swap_stack_elements,
     },
 };
 use num_bigint::BigUint;
@@ -23,6 +24,7 @@ pub fn generate_code_for_op<'c>(
     op: Operation,
 ) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
     match op {
+        Operation::Stop => codegen_stop(op_ctx, region),
         Operation::Sgt => codegen_sgt(op_ctx, region),
         Operation::Add => codegen_add(op_ctx, region),
         Operation::Sub => codegen_sub(op_ctx, region),
@@ -1159,4 +1161,27 @@ fn codegen_pc<'c>(
     stack_push(context, &ok_block, pc_value)?;
 
     Ok((start_block, ok_block))
+}
+
+fn codegen_stop<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    let zero = start_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i8(context, 0).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    start_block.append_operation(func::r#return(&[zero], location));
+    let empty_block = region.append_block(Block::new(&[]));
+
+    Ok((start_block, empty_block))
 }

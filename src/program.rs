@@ -2,7 +2,7 @@ use num_bigint::BigUint;
 
 #[derive(Debug)]
 pub enum Opcode {
-    // STOP = 0x00,
+    STOP = 0x00,
     ADD = 0x01,
     MUL = 0x02,
     SUB = 0x03,
@@ -168,6 +168,7 @@ pub enum Opcode {
 impl From<u8> for Opcode {
     fn from(opcode: u8) -> Opcode {
         match opcode {
+            x if x == Opcode::STOP as u8 => Opcode::STOP,
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::MUL as u8 => Opcode::MUL,
             x if x == Opcode::XOR as u8 => Opcode::XOR,
@@ -237,6 +238,7 @@ impl From<u8> for Opcode {
 
 #[derive(Debug, Clone)]
 pub enum Operation {
+    Stop,
     Add,
     Sub,
     Mul,
@@ -277,6 +279,7 @@ impl Program {
                 break;
             };
             let op = match Opcode::from(opcode) {
+                Opcode::STOP => Operation::Stop,
                 Opcode::ADD => Operation::Add,
                 Opcode::SUB => Operation::Sub,
                 Opcode::MUL => Operation::Mul,
