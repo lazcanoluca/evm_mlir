@@ -23,7 +23,7 @@ pub enum Opcode {
     // EQ = 0x14,
     ISZERO = 0x15,
     AND = 0x16,
-    // OR = 0x17,
+    OR = 0x17,
     XOR = 0x18,
     // NOT = 0x19,
     BYTE = 0x1A,
@@ -254,6 +254,7 @@ pub enum Operation {
     Dup(u32),
     Swap(u32),
     Byte,
+    Or,
     Jumpi,
     Jump,
     And,
@@ -516,6 +517,7 @@ impl Program {
                 Opcode::BYTE => Operation::Byte,
                 Opcode::JUMPI => Operation::Jumpi,
                 Opcode::AND => Operation::And,
+                Opcode::OR => Operation::Or,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
             operations.push(op);
