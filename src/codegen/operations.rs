@@ -38,9 +38,77 @@ pub fn generate_code_for_op<'c>(
         Operation::Push(x) => codegen_push(op_ctx, region, x),
         Operation::Swap(x) => codegen_swap(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
+        Operation::IsZero => codegen_iszero(op_ctx, region),
         Operation::Jump => codegen_jump(op_ctx, region),
         Operation::And => codegen_and(op_ctx, region),
     }
+}
+
+fn codegen_iszero<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 1)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let value = stack_pop(context, &ok_block)?;
+    let value_is_zero = check_if_zero(context, &ok_block, &value)?;
+
+    let val_zero_bloq = region.append_block(Block::new(&[]));
+    let val_not_zero_bloq = region.append_block(Block::new(&[]));
+    let return_block = region.append_block(Block::new(&[]));
+
+    let constant_value = val_zero_bloq
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, 1i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &val_zero_bloq, constant_value)?;
+    val_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    let result = val_not_zero_bloq
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, 0i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &val_not_zero_bloq, result)?;
+    val_not_zero_bloq.append_operation(cf::br(&return_block, &[], location));
+
+    ok_block.append_operation(cf::cond_br(
+        context,
+        value_is_zero,
+        &val_zero_bloq,
+        &val_not_zero_bloq,
+        &[],
+        &[],
+        location,
+    ));
+
+    Ok((start_block, return_block))
 }
 
 fn codegen_and<'c, 'r>(
