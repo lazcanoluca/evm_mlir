@@ -3,8 +3,8 @@ use evm_mlir::{
     constants::REVERT_EXIT_CODE,
     program::{Operation, Program},
 };
-use rstest::rstest;
 use num_bigint::BigUint;
+use rstest::rstest;
 use tempfile::NamedTempFile;
 
 fn run_program_assert_result(operations: Vec<Operation>, expected_result: u8) {
@@ -127,8 +127,8 @@ fn dup_nth(#[case] nth: u8) {
 #[test]
 fn dup_with_stack_underflow() {
     let program = vec![Operation::Dup(1)];
-    
-  run_program_assert_revert(program);
+
+    run_program_assert_revert(program);
 }
 fn swap_first() {
     let program = vec![
