@@ -464,7 +464,7 @@ fn codegen_jumpi<'c, 'r: 'c>(
     let condition = ok_block
         .append_operation(arith::cmpi(
             context,
-            arith::CmpiPredicate::Ugt,
+            arith::CmpiPredicate::Ne,
             condition,
             zero,
             location,
