@@ -31,6 +31,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Div => codegen_div(op_ctx, region),
         Operation::Mod => codegen_mod(op_ctx, region),
         Operation::Addmod => codegen_addmod(op_ctx, region),
+        Operation::Mulmod => todo!(),
         Operation::Pop => codegen_pop(op_ctx, region),
         Operation::PC { pc } => codegen_pc(op_ctx, region, pc),
         Operation::Lt => codegen_lt(op_ctx, region),

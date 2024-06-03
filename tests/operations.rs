@@ -642,6 +642,56 @@ fn addmod_with_zero_denominator() {
 }
 
 #[test]
+fn mulmod_with_non_zero_result() {
+    let (a, b, den) = (
+        BigUint::from(13_u8),
+        BigUint::from(30_u8),
+        BigUint::from(10_u8),
+    );
+
+    let program = vec![
+        Operation::Push(den.clone()),
+        Operation::Push(b.clone()),
+        Operation::Push(a.clone()),
+        Operation::Mulmod,
+    ];
+    run_program_assert_result(program, ((a * b) % den).try_into().unwrap());
+}
+
+#[test]
+fn mulmod_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Mulmod]);
+}
+
+#[test]
+fn mulmod_with_zero_denominator() {
+    let program = vec![
+        Operation::Push(BigUint::from(0_u8)),
+        Operation::Push(BigUint::from(31_u8)),
+        Operation::Push(BigUint::from(11_u8)),
+        Operation::Addmod,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn mulmod_with_overflow() {
+    let (a, b, den) = (
+        BigUint::from_bytes_be(&[0XFF; 32]),
+        BigUint::from_bytes_be(&[0XFF; 32]),
+        BigUint::from(10_u8),
+    );
+
+    let program = vec![
+        Operation::Push(den.clone()),
+        Operation::Push(b.clone()),
+        Operation::Push(a.clone()),
+        Operation::Mulmod,
+    ];
+    run_program_assert_result(program, ((a * b) % den).try_into().unwrap());
+}
+
+#[test]
 fn test_sgt_positive_greater_than() {
     let a = BigUint::from(2_u8);
     let b = BigUint::from(1_u8);
