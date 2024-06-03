@@ -11,7 +11,7 @@ pub enum Opcode {
     MOD = 0x06,
     // SMOD = 0x07,
     ADDMOD = 0x08,
-    // MULMOD = 0x09,
+    MULMOD = 0x09,
     EXP = 0x0A,
     // SIGNEXTEND = 0x0B,
 
@@ -178,6 +178,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::MOD as u8 => Opcode::MOD,
             x if x == Opcode::JUMPDEST as u8 => Opcode::JUMPDEST,
             x if x == Opcode::ADDMOD as u8 => Opcode::ADDMOD,
+            x if x == Opcode::MULMOD as u8 => Opcode::MULMOD,
             x if x == Opcode::PUSH0 as u8 => Opcode::PUSH0,
             x if x == Opcode::PUSH1 as u8 => Opcode::PUSH1,
             x if x == Opcode::PUSH2 as u8 => Opcode::PUSH2,
@@ -243,6 +244,7 @@ pub enum Operation {
     Sub,
     Mul,
     Addmod,
+    Mulmod,
     Sgt,
     Xor,
     Pop,
@@ -295,6 +297,7 @@ impl Program {
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::JUMP => Operation::Jump,
                 Opcode::ADDMOD => Operation::Addmod,
+                Opcode::MULMOD => Operation::Mulmod,
                 Opcode::PUSH0 => Operation::Push(BigUint::ZERO),
                 Opcode::PUSH1 => {
                     pc += 1;
