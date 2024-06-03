@@ -312,7 +312,7 @@ fn codegen_mod<'c, 'r>(
         &[],
         location,
     ));
-  
+
     let num = stack_pop(context, &ok_block)?;
     let den = stack_pop(context, &ok_block)?;
 
