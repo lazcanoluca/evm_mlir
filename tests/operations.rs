@@ -269,3 +269,66 @@ fn jumpdest() {
     ];
     run_program_assert_result(program, expected)
 }
+
+#[test]
+fn jumpi_with_true_condition() {
+    // this test is equivalent to the following bytecode program
+    //
+    // [00] PUSH1 5
+    // [02] PUSH1 1  // push condition
+    // [04] PUSH1 9  // push pc
+    // [06] JUMPI
+    // [07] PUSH1 10
+    // [09] JUMPDEST
+    let (a, b) = (5_u8, 10_u8);
+    let condition: BigUint = BigUint::from(1_u8);
+    let pc: usize = 9;
+    let program = vec![
+        Operation::Push(BigUint::from(a)),
+        Operation::Push(condition),
+        Operation::Push(BigUint::from(pc as u8)),
+        Operation::Jumpi,
+        Operation::Push(BigUint::from(b)), // this should not be executed
+        Operation::Jumpdest { pc },
+    ];
+    run_program_assert_result(program, a);
+}
+
+#[test]
+fn jumpi_with_false_condition() {
+    // this test is equivalent to the following bytecode program
+    //
+    // [00] PUSH1 5
+    // [02] PUSH1 0  // push condition
+    // [04] PUSH1 9  // push pc
+    // [06] JUMPI
+    // [07] PUSH1 10
+    // [09] JUMPDEST
+    let (a, b) = (5_u8, 10_u8);
+    let condition: BigUint = BigUint::from(0_u8);
+    let pc: usize = 9;
+    let program = vec![
+        Operation::Push(BigUint::from(a)),
+        Operation::Push(condition),
+        Operation::Push(BigUint::from(pc as u8)),
+        Operation::Jumpi,
+        Operation::Push(BigUint::from(b)),
+        Operation::Jumpdest { pc },
+    ];
+    run_program_assert_result(program, b);
+}
+
+#[test]
+fn jumpi_reverts_if_pc_is_wrong() {
+    // if the pc given does not correspond to a jump destination then
+    // the program should revert
+    let pc = BigUint::from(7_u8);
+    let condition = BigUint::from(1_u8);
+    let program = vec![
+        Operation::Push(condition),
+        Operation::Push(pc),
+        Operation::Jumpi,
+        Operation::Jumpdest { pc: 83 },
+    ];
+    run_program_assert_revert(program);
+}
