@@ -273,21 +273,16 @@ fn jumpdest() {
 #[test]
 fn test_and() {
     let (a, b) = (BigUint::from(0b1010_u8), BigUint::from(0b1100_u8));
-    let expected_result = (a.clone() & b.clone()).try_into().unwrap();
-
+    let expected_result = 0b1000_u8;
     let program = vec![Operation::Push(a), Operation::Push(b), Operation::And];
     run_program_assert_result(program, expected_result);
 }
-
 #[test]
 fn test_and_with_zero() {
     let a = BigUint::from(0_u8);
     let b = BigUint::from(0xFF_u8);
-
-    let expected_result = (a.clone() & b.clone()).try_into().unwrap();
-
+    let expected_result = 0_u8;
     let program = vec![Operation::Push(a), Operation::Push(b), Operation::And];
-
     run_program_assert_result(program, expected_result);
 }
 
