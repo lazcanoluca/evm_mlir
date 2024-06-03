@@ -333,13 +333,13 @@ fn jumpdest() {
 fn test_or() {
     let a = BigUint::from(0b1010_u8);
     let b = BigUint::from(0b1110_u8);
-    let expected = BigUint::from(0b1110_u8);
+    let expected = 0b1110_u8;
     let program = vec![
         Operation::Push(a.clone()),
         Operation::Push(b.clone()),
         Operation::Or,
     ];
-    run_program_assert_result(program, expected.try_into().unwrap());
+    run_program_assert_result(program, expected);
 }
 
 #[test]
