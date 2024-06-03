@@ -1032,6 +1032,18 @@ fn test_lt_stack_underflow() {
 }
 
 #[test]
+fn test_gas_with_add_should_revert() {
+    let (a, b) = (BigUint::from(1_u8), BigUint::from(2_u8));
+    let mut program = vec![];
+    for _ in 0..334 {
+        program.push(Operation::Push(a.clone()));
+        program.push(Operation::Push(b.clone()));
+        program.push(Operation::Add);
+    }
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn stop() {
     // the push operation should not be executed
     let program = vec![Operation::Stop, Operation::Push(BigUint::from(10_u8))];
