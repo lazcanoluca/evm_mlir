@@ -534,6 +534,31 @@ fn jumpdest() {
 }
 
 #[test]
+fn test_eq_true() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Eq,
+    ];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_eq_false() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Eq,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_eq_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Eq]);
+}
+
+#[test]
 fn test_or() {
     let a = BigUint::from(0b1010_u8);
     let b = BigUint::from(0b1110_u8);
