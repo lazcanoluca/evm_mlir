@@ -67,7 +67,7 @@ fn codegen_iszero<'c, 'r>(
     ));
 
     let value = stack_pop(context, &ok_block)?;
-    let value_is_zero = check_denominator_is_zero(context, &ok_block, &value)?;
+    let value_is_zero = check_if_zero(context, &ok_block, &value)?;
 
     let val_zero_bloq = region.append_block(Block::new(&[]));
     let val_not_zero_bloq = region.append_block(Block::new(&[]));
