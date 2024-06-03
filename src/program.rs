@@ -67,6 +67,9 @@ pub enum Opcode {
     // MSTORE8 = 0x53,
     // SLOAD = 0x54,
     // SSTORE = 0x55,
+    // JUMP = 0x56,
+    JUMPI = 0x57,
+    // PC = 0x58,
     JUMP = 0x56,
     // JUMPI = 0x57,
     PC = 0x58,
@@ -224,6 +227,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::SWAP1 as u8 => Opcode::SWAP15,
             x if x == Opcode::SWAP1 as u8 => Opcode::SWAP16,
             x if x == Opcode::BYTE as u8 => Opcode::BYTE,
+            x if x == Opcode::JUMPI as u8 => Opcode::JUMPI,
             x if x == Opcode::JUMP as u8 => Opcode::JUMP,
             _ => Opcode::UNUSED,
         }
@@ -248,6 +252,7 @@ pub enum Operation {
     Push(BigUint),
     Swap(u32),
     Byte,
+    Jumpi,
     Jump,
     And,
 }
@@ -490,6 +495,7 @@ impl Program {
                 Opcode::SWAP15 => Operation::Swap(15),
                 Opcode::SWAP16 => Operation::Swap(16),
                 Opcode::BYTE => Operation::Byte,
+                Opcode::JUMPI => Operation::Jumpi,
                 Opcode::AND => Operation::And,
                 Opcode::UNUSED => panic!("Unknown opcode {:02X}", opcode),
             };
