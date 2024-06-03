@@ -383,3 +383,39 @@ fn addmod_with_zero_denominator() {
     ];
     run_program_assert_result(program, 0);
 }
+
+#[test]
+fn test_lt_false() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Lt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_lt_true() {
+    let program = vec![
+        Operation::Push(BigUint::from(2_u8)),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Lt,
+    ];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_lt_equal() {
+    let program = vec![
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Push(BigUint::from(1_u8)),
+        Operation::Lt,
+    ];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_lt_stack_underflow() {
+    let program = vec![Operation::Lt];
+    run_program_assert_revert(program);
+}
