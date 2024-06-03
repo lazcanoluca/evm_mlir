@@ -330,6 +330,44 @@ fn jumpdest() {
 }
 
 #[test]
+fn jump() {
+    // this test is equivalent to the following bytecode program
+    // the program executes sequentially until the JUMP where
+    // it jumps to the opcode in the position 7 so the PUSH1 10
+    // opcode is not executed => the return value should be equal
+    // to the first pushed value (a = 5)
+    //
+    // [00] PUSH1 5
+    // [02] PUSH1 7  // push pc
+    // [04] JUMP
+    // [05] PUSH1 10
+    // [07] JUMPDEST
+    let (a, b) = (5_u8, 10_u8);
+    let pc: usize = 7;
+    let program = vec![
+        Operation::Push(BigUint::from(a)),
+        Operation::Push(BigUint::from(pc as u8)),
+        Operation::Jump,
+        Operation::Push(BigUint::from(b)), // this should not be executed
+        Operation::Jumpdest { pc },
+    ];
+    run_program_assert_result(program, a);
+}
+
+#[test]
+fn jump_reverts_if_pc_is_wrong() {
+    // if the pc given does not correspond to a jump destination then
+    // the program should revert
+    let pc = BigUint::from(7_u8);
+    let program = vec![
+        Operation::Push(pc),
+        Operation::Jump,
+        Operation::Jumpdest { pc: 83 },
+    ];
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn pc_with_previous_push() {
     let pc = 33;
     let program = vec![
