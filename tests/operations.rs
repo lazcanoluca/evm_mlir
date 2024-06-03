@@ -130,6 +130,8 @@ fn dup_with_stack_underflow() {
 
     run_program_assert_revert(program);
 }
+
+#[test]
 fn swap_first() {
     let program = vec![
         Operation::Push(BigUint::from(1_u8)),
