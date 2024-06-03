@@ -330,6 +330,27 @@ fn jumpdest() {
 }
 
 #[test]
+fn test_and() {
+    let (a, b) = (BigUint::from(0b1010_u8), BigUint::from(0b1100_u8));
+    let expected_result = 0b1000_u8;
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::And];
+    run_program_assert_result(program, expected_result);
+}
+#[test]
+fn test_and_with_zero() {
+    let a = BigUint::from(0_u8);
+    let b = BigUint::from(0xFF_u8);
+    let expected_result = 0_u8;
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::And];
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn and_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::And]);
+}
+
+#[test]
 fn mod_with_non_zero_result() {
     let (num, den) = (BigUint::from(31_u8), BigUint::from(10_u8));
     let expected_result = (&num % &den).try_into().unwrap();
