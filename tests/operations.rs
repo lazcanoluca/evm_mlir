@@ -406,6 +406,24 @@ fn pop_with_stack_underflow() {
 }
 
 #[test]
+fn push_push_sar() {
+    let (value, shift) = (2_u8, 1_u8);
+    let program = vec![
+        Operation::Push(BigUint::from(value)),
+        Operation::Push(BigUint::from(shift)),
+        Operation::Sar,
+    ];
+    let expected_result = value >> shift;
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn sar_with_stack_underflow() {
+    let program = vec![Operation::Sar];
+    run_program_assert_revert(program);
+}
+
+#[test]
 fn push_push_byte() {
     let mut value: [u8; 32] = [0; 32];
     let desired_byte = 0xff;
@@ -424,6 +442,70 @@ fn push_push_byte() {
 fn byte_with_stack_underflow() {
     let program = vec![Operation::Byte];
     run_program_assert_revert(program);
+}
+
+#[test]
+fn sar_with_negative_value_preserves_sign() {
+    // in this example the the value to be shifted is a 256 bit number
+    // where the most significative bit is 1 cand the rest of the bits are 0.
+    // i.e,  value = 1000..0000
+    //
+    // if we shift this value 255 positions to the right, given that
+    // the sar operation preserves the sign, the result must be a number
+    // in which every bit is 1
+    // i.e, result = 1111..1111
+    //
+    // given that the program results is a u8, the result is then truncated
+    // to the less 8 significative bits, i.e  result = 0b11111111.
+    //
+    // this same example can be visualized in the evm playground in the following link
+    // https://www.evm.codes/playground?fork=cancun&unit=Wei&codeType=Mnemonic&code='%2F%2F%20Example%201z32%200x8yyyz8%20255wSAR'~0000000zwPUSHy~~~w%5Cn%01wyz~_
+
+    let mut value: [u8; 32] = [0; 32];
+    value[0] = 0b10000000;
+    let value = BigUint::from_bytes_be(&value);
+
+    let shift: u8 = 255;
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(shift)),
+        Operation::Sar,
+    ];
+    let expected_result = 0b11111111;
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn sar_with_positive_value_preserves_sign() {
+    let mut value: [u8; 32] = [0xff; 32];
+    value[0] = 0;
+    let value = BigUint::from_bytes_be(&value);
+
+    let shift: u8 = 255;
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(shift)),
+        Operation::Sar,
+    ];
+    let expected_result = 0;
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
+fn sar_with_shift_out_of_bounds() {
+    // even if the shift is larger than 255 the SAR operation should
+    // work the same.
+
+    let value = BigUint::from_bytes_be(&[0xff; 32]);
+    let shift: usize = 1024;
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(shift)),
+        Operation::Sar,
+    ];
+    // in this case the expected result is 0xff because of the sign extension
+    let expected_result = 0xff;
+    run_program_assert_result(program, expected_result);
 }
 
 #[test]

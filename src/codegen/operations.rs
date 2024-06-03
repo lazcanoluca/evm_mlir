@@ -36,6 +36,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Lt => codegen_lt(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
+        Operation::Sar => codegen_sar(op_ctx, region),
         Operation::Dup(x) => codegen_dup(op_ctx, region, x),
         Operation::Swap(x) => codegen_swap(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
@@ -776,6 +777,62 @@ fn codegen_pop<'c, 'r>(
     ));
 
     stack_pop(context, &ok_block)?;
+
+    Ok((start_block, ok_block))
+}
+
+fn codegen_sar<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let shift = stack_pop(context, &ok_block)?;
+    let value = stack_pop(context, &ok_block)?;
+
+    let mut max_shift: [u8; 32] = [0; 32];
+    max_shift[31] = 255;
+
+    // max_shift = 255
+    let max_shift = ok_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant(context, max_shift),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    // if shift > 255  then after applying the `shrsi` operation the result will be poisoned
+    // to avoid the poisoning we set shift = min(shift, 255)
+    let shift = ok_block
+        .append_operation(arith::minui(shift, max_shift, location))
+        .result(0)?
+        .into();
+
+    let result = ok_block
+        .append_operation(arith::shrsi(value, shift, location))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
 
     Ok((start_block, ok_block))
 }
