@@ -354,6 +354,22 @@ fn sar_with_negative_value_preserves_sign() {
 }
 
 #[test]
+fn sar_with_positive_value_preserves_sign() {
+    let mut value: [u8; 32] = [0xff; 32];
+    value[0] = 0;
+    let value = BigUint::from_bytes_be(&value);
+
+    let shift: u8 = 255;
+    let program = vec![
+        Operation::Push(value),
+        Operation::Push(BigUint::from(shift)),
+        Operation::Sar,
+    ];
+    let expected_result = 0;
+    run_program_assert_result(program, expected_result);
+}
+
+#[test]
 fn sar_with_shift_out_of_bounds() {
     // even if the shift is larger than 255 the SAR operation should
     // work the same.
