@@ -32,6 +32,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Mod => codegen_mod(op_ctx, region),
         Operation::Addmod => codegen_addmod(op_ctx, region),
         Operation::Pop => codegen_pop(op_ctx, region),
+        Operation::PC { pc } => codegen_pc(op_ctx, region, pc),
         Operation::Lt => codegen_lt(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
@@ -795,4 +796,41 @@ fn codegen_jump<'c, 'r: 'c>(
     // probably there's a better way to do this
     let empty_block = region.append_block(Block::new(&[]));
     Ok((start_block, empty_block))
+}
+
+fn codegen_pc<'c>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'c Region<'c>,
+    pc: usize,
+) -> Result<(BlockRef<'c, 'c>, BlockRef<'c, 'c>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    let flag = check_stack_has_space_for(context, &start_block, 1)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let pc_value = ok_block
+        .append_operation(arith::constant(
+            context,
+            integer_constant_from_i64(context, pc as i64).into(),
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, pc_value)?;
+
+    Ok((start_block, ok_block))
 }

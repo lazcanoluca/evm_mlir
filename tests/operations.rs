@@ -368,6 +368,25 @@ fn jump_reverts_if_pc_is_wrong() {
 }
 
 #[test]
+fn pc_with_previous_push() {
+    let pc = 33;
+    let program = vec![
+        Operation::Push(BigUint::from(8_u8)), //
+        Operation::PC { pc },                 //
+    ];
+    run_program_assert_result(program, pc as u8)
+}
+
+#[test]
+fn pc_with_no_previous_operation() {
+    let pc = 0;
+    let program = vec![
+        Operation::PC { pc }, //
+    ];
+    run_program_assert_result(program, pc as u8)
+}
+
+#[test]
 fn test_and() {
     let (a, b) = (BigUint::from(0b1010_u8), BigUint::from(0b1100_u8));
     let expected_result = 0b1000_u8;
