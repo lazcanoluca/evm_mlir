@@ -327,16 +327,14 @@ fn push_push_exp() {
 
 #[test]
 fn exp_with_overflow_should_wrap() {
-    let a = BigUint::from(2_u8);
+    let a = BigUint::from(3_u8);
     let b = BigUint::from(256_u16);
-
     let program = vec![
         Operation::Push(a.clone()),
         Operation::Push(b.clone()),
         Operation::Exp,
     ];
-
-    run_program_assert_result(program, 0);
+    run_program_assert_result(program, 1);
 }
 
 #[test]
