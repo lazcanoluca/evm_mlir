@@ -16,8 +16,7 @@ pub enum Opcode {
     // SIGNEXTEND = 0x0B,
 
     // unused 0x0C-0x0F
-
-    // LT = 0x10,
+    LT = 0x10,
     // GT = 0x11,
     // SLT = 0x12,
     SGT = 0x13,
@@ -220,6 +219,7 @@ pub enum Operation {
     Addmod,
     Sgt,
     Pop,
+    Lt,
     Div,
     Mod,
     Jumpdest { pc: usize },
@@ -245,6 +245,7 @@ impl Program {
                 Opcode::ADD => Operation::Add,
                 Opcode::SUB => Operation::Sub,
                 Opcode::MUL => Operation::Mul,
+                Opcode::LT => Operation::Lt,
                 Opcode::POP => Operation::Pop,
                 Opcode::DIV => Operation::Div,
                 Opcode::MOD => Operation::Mod,

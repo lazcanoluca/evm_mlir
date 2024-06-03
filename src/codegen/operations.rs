@@ -31,10 +31,53 @@ pub fn generate_code_for_op<'c>(
         Operation::Mod => codegen_mod(op_ctx, region),
         Operation::Addmod => codegen_addmod(op_ctx, region),
         Operation::Pop => codegen_pop(op_ctx, region),
+        Operation::Lt => codegen_lt(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
         Operation::Push(x) => codegen_push(op_ctx, region, x),
         Operation::Byte => codegen_byte(op_ctx, region),
     }
+}
+
+fn codegen_lt<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    // Check there's enough elements in stack
+    let flag = check_stack_has_at_least(context, &start_block, 2)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let lhs = stack_pop(context, &ok_block)?;
+    let rhs = stack_pop(context, &ok_block)?;
+
+    let result = ok_block
+        .append_operation(arith::cmpi(
+            context,
+            arith::CmpiPredicate::Ult,
+            lhs,
+            rhs,
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, result)?;
+
+    Ok((start_block, ok_block))
 }
 
 fn codegen_sgt<'c, 'r>(
