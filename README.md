@@ -16,9 +16,9 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 
 1. (0x01) ADD
 1. (0x02) MUL
-1. (0x1D) SAR
 1. (0x04) DIV
 1. (0x1A) BYTE
+1. (0x1D) SAR
 1. (0x50) POP
 1. (0x5B) JUMPDEST
 1. (0x5F) PUSH0
