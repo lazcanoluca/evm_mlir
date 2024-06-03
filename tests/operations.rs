@@ -677,8 +677,8 @@ fn mulmod_with_zero_denominator() {
 #[test]
 fn mulmod_with_overflow() {
     let (a, b, den) = (
-        BigUint::from_bytes_be(&[0XFF; 32]),
-        BigUint::from_bytes_be(&[0XFF; 32]),
+        BigUint::from_bytes_be(&[0xff; 32]),
+        BigUint::from_bytes_be(&[0xff; 32]),
         BigUint::from(10_u8),
     );
 
