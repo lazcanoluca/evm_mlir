@@ -17,7 +17,7 @@ pub enum Opcode {
 
     // unused 0x0C-0x0F
     LT = 0x10,
-    // GT = 0x11,
+    GT = 0x11,
     // SLT = 0x12,
     SGT = 0x13,
     EQ = 0x14,
@@ -255,6 +255,7 @@ pub enum Operation {
     Mod,
     Exp,
     Eq,
+    Gt,
     Jumpdest { pc: usize },
     Push(BigUint),
     Sar,
@@ -296,6 +297,7 @@ impl Program {
                 Opcode::SGT => Operation::Sgt,
                 Opcode::EXP => Operation::Exp,
                 Opcode::EQ => Operation::Eq,
+                Opcode::GT => Operation::Gt,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
                 Opcode::JUMP => Operation::Jump,
                 Opcode::ADDMOD => Operation::Addmod,

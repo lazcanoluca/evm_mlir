@@ -826,6 +826,35 @@ fn addmod_with_zero_denominator() {
 }
 
 #[test]
+fn test_gt_less_than() {
+    let a = BigUint::from(9_u8);
+    let b = BigUint::from(8_u8);
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::Gt];
+    run_program_assert_result(program, 1);
+}
+
+#[test]
+fn test_gt_greater_than() {
+    let a = BigUint::from(8_u8);
+    let b = BigUint::from(9_u8);
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::Gt];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn test_gt_equal() {
+    let a = BigUint::from(10_u8);
+    let b = BigUint::from(10_u8);
+    let program = vec![Operation::Push(a), Operation::Push(b), Operation::Gt];
+    run_program_assert_result(program, 0);
+}
+
+#[test]
+fn gt_with_stack_underflow() {
+    run_program_assert_revert(vec![Operation::Gt]);
+}
+
+#[test]
 fn mulmod_with_non_zero_result() {
     let (a, b, den) = (
         BigUint::from(13_u8),
