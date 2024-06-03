@@ -29,7 +29,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x58) PC
 1. (0x56) JUMP
 1. (0x5B) JUMPDEST
-1. (0x14) EQ
 1. (0x15) ISZERO
 1. (0x5F) PUSH0
 1. (0x60) PUSH1
