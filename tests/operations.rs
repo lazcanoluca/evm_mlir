@@ -2240,3 +2240,96 @@ fn mload_out_of_gas() {
     ];
     run_program_assert_halt(program);
 }
+
+#[test]
+fn mstore_mcopy_mload_with_zero_address_and_gas() {
+    let program = vec![
+        Operation::Push((1_u8, BigUint::from(10_u8))),
+        Operation::Push0,
+        Operation::Mstore,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Push0,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mcopy,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mload,
+    ];
+    let dynamic_gas = gas_cost::memory_expansion_cost(0, 64);
+    let gas_needed = gas_cost::PUSH0 * 2
+        + gas_cost::PUSHN * 4
+        + gas_cost::MCOPY
+        + gas_cost::MLOAD
+        + gas_cost::MSTORE
+        + dynamic_gas;
+
+    run_program_assert_gas_exact(program, gas_needed as _);
+}
+
+#[test]
+fn mstore_mcopy_mload_with_zero_address() {
+    let value = BigUint::from(10_u8);
+    let value1 = BigUint::from(2_u8);
+    let program = vec![
+        Operation::Push((1_u8, value)),
+        Operation::Push0,
+        Operation::Mstore,
+        Operation::Push((1_u8, value1)),
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mstore,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Push0,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mcopy,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mload,
+    ];
+
+    run_program_assert_stack_top(program, 10_u8.into());
+}
+
+#[test]
+fn mcopy_offset_equals_dest_offset() {
+    let value = BigUint::from(123_u8);
+    let program = vec![
+        Operation::Push((1_u8, value)),
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mstore,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mcopy,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mload,
+    ];
+
+    run_program_assert_stack_top(program, 123_u8.into());
+}
+
+#[test]
+fn mstore_mcopy_mload_with_zero_address_arbitrary_size() {
+    let value = BigUint::from(1_u8) << 24;
+    let value1 = BigUint::from(2_u8) << 24;
+    let program = vec![
+        Operation::Push((1_u8, value1)),
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mstore,
+        Operation::Push((1_u8, value)),
+        Operation::Push0,
+        Operation::Mstore,
+        Operation::Push((1_u8, BigUint::from(4_u8))),
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Push0,
+        Operation::Mcopy,
+        Operation::Push((1_u8, BigUint::from(32_u8))),
+        Operation::Mload,
+    ];
+    let result = (16777216_u32 * 2).into();
+    run_program_assert_stack_top(program, result);
+}
+
+#[test]
+fn mcopy_with_stack_underflow() {
+    let program = vec![Operation::Mcopy];
+
+    run_program_assert_halt(program);
+}

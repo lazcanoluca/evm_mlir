@@ -75,7 +75,7 @@ pub enum Opcode {
     JUMPDEST = 0x5B,
     // TLOAD = 0x5C,
     // TSTORE = 0x5D,
-    // MCOPY = 0x5E,
+    MCOPY = 0x5E,
     PUSH0 = 0x5F,
     PUSH1 = 0x60,
     PUSH2 = 0x61,
@@ -206,6 +206,7 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::MSIZE as u8 => Opcode::MSIZE,
             x if x == Opcode::GAS as u8 => Opcode::GAS,
             x if x == Opcode::JUMPDEST as u8 => Opcode::JUMPDEST,
+            x if x == Opcode::MCOPY as u8 => Opcode::MCOPY,
             x if x == Opcode::PUSH0 as u8 => Opcode::PUSH0,
             x if x == Opcode::PUSH1 as u8 => Opcode::PUSH1,
             x if x == Opcode::PUSH2 as u8 => Opcode::PUSH2,
@@ -318,6 +319,7 @@ pub enum Operation {
     Msize,
     Gas,
     Jumpdest { pc: usize },
+    Mcopy,
     Push0,
     Push((u8, BigUint)),
     Dup(u8),
@@ -365,6 +367,7 @@ impl Operation {
             Operation::Msize => vec![Opcode::MSIZE as u8],
             Operation::Gas => vec![Opcode::GAS as u8],
             Operation::Jumpdest { pc: _ } => vec![Opcode::JUMPDEST as u8],
+            Operation::Mcopy => vec![Opcode::MCOPY as u8],
             Operation::Push0 => vec![Opcode::PUSH0 as u8],
             Operation::Push((n, x)) => {
                 let len = 1 + *n as usize;
@@ -445,6 +448,7 @@ impl Program {
                 Opcode::MSIZE => Operation::Msize,
                 Opcode::GAS => Operation::Gas,
                 Opcode::JUMPDEST => Operation::Jumpdest { pc },
+                Opcode::MCOPY => Operation::Mcopy,
                 Opcode::PUSH0 => Operation::Push0,
                 Opcode::PUSH1 => {
                     pc += 1;

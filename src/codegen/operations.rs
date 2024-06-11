@@ -70,6 +70,7 @@ pub fn generate_code_for_op<'c>(
         Operation::Msize => codegen_msize(op_ctx, region),
         Operation::Gas => codegen_gas(op_ctx, region),
         Operation::Jumpdest { pc } => codegen_jumpdest(op_ctx, region, pc),
+        Operation::Mcopy => codegen_mcopy(op_ctx, region),
         Operation::Dup(x) => codegen_dup(op_ctx, region, x),
         Operation::Swap(x) => codegen_swap(op_ctx, region, x),
         Operation::Return => codegen_return(op_ctx, region),
@@ -2580,6 +2581,146 @@ fn codegen_mstore8<'c, 'r>(
         LoadStoreOptions::new()
             .align(IntegerAttribute::new(IntegerType::new(context, 64).into(), 1).into()),
     ));
+
+    Ok((start_block, memory_access_block))
+}
+
+fn codegen_mcopy<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+    let uint32 = IntegerType::new(context, 32);
+    let uint8 = IntegerType::new(context, 8);
+    let ptr_type = pointer(context, 0);
+
+    let flag = check_stack_has_at_least(context, &start_block, 3)?;
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    // where to copy
+    let dest_offset = stack_pop(context, &ok_block)?;
+    // where to copy from
+    let offset = stack_pop(context, &ok_block)?;
+    let size = stack_pop(context, &ok_block)?;
+
+    // truncate offset and dest_offset to 32 bits
+    let offset = ok_block
+        .append_operation(arith::trunci(offset, uint32.into(), location))
+        .result(0)?
+        .into();
+
+    let dest_offset = ok_block
+        .append_operation(arith::trunci(dest_offset, uint32.into(), location))
+        .result(0)?
+        .into();
+
+    let size = ok_block
+        .append_operation(arith::trunci(size, uint32.into(), location))
+        .result(0)?
+        .into();
+
+    // required_size = offset + size
+    let src_required_size = ok_block
+        .append_operation(arith::addi(offset, size, location))
+        .result(0)?
+        .into();
+
+    // dest_required_size = dest_offset + size
+    let dest_required_size = ok_block
+        .append_operation(arith::addi(dest_offset, size, location))
+        .result(0)?
+        .into();
+
+    let required_size = ok_block
+        .append_operation(arith::maxui(
+            src_required_size,
+            dest_required_size,
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    let memory_access_block = region.append_block(Block::new(&[]));
+
+    extend_memory(
+        op_ctx,
+        &ok_block,
+        &memory_access_block,
+        region,
+        required_size,
+        gas_cost::MCOPY,
+    )?;
+
+    // Memory access
+    let memory_ptr_ptr = memory_access_block
+        .append_operation(llvm_mlir::addressof(
+            context,
+            MEMORY_PTR_GLOBAL,
+            ptr_type,
+            location,
+        ))
+        .result(0)?;
+
+    let memory_ptr = memory_access_block
+        .append_operation(llvm::load(
+            context,
+            memory_ptr_ptr.into(),
+            ptr_type,
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?
+        .into();
+
+    let source = memory_access_block
+        .append_operation(llvm::get_element_ptr_dynamic(
+            context,
+            memory_ptr,
+            &[offset],
+            uint8.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    // memory_destination = memory_ptr + dest_offset
+    let destination = memory_access_block
+        .append_operation(llvm::get_element_ptr_dynamic(
+            context,
+            memory_ptr,
+            &[dest_offset],
+            uint8.into(),
+            ptr_type,
+            location,
+        ))
+        .result(0)?
+        .into();
+
+    memory_access_block.append_operation(
+        ods::llvm::intr_memmove(
+            context,
+            destination,
+            source,
+            size,
+            IntegerAttribute::new(IntegerType::new(context, 1).into(), 0),
+            location,
+        )
+        .into(),
+    );
 
     Ok((start_block, memory_access_block))
 }
