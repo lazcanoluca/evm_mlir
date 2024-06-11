@@ -38,7 +38,7 @@ pub enum Opcode {
     // ORIGIN = 0x32,
     // CALLER = 0x33,
     // CALLVALUE = 0x34,
-    // CALLDATALOAD = 0x35,
+    CALLDATALOAD = 0x35,
     CALLDATASIZE = 0x36,
     // CALLDATACOPY = 0x37,
     CODESIZE = 0x38,
@@ -276,6 +276,7 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::RETURN as u8 => Opcode::RETURN,
             x if x == Opcode::MSTORE as u8 => Opcode::MSTORE,
             x if x == Opcode::MSTORE8 as u8 => Opcode::MSTORE8,
+            x if x == Opcode::CALLDATALOAD as u8 => Opcode::CALLDATALOAD,
             x => return Err(OpcodeParseError(x)),
         };
 
@@ -328,6 +329,7 @@ pub enum Operation {
     Revert,
     Mstore,
     Mstore8,
+    CalldataLoad,
     CallDataSize,
 }
 
@@ -384,6 +386,7 @@ impl Operation {
             Operation::Revert => vec![Opcode::REVERT as u8],
             Operation::Mstore => vec![Opcode::MSTORE as u8],
             Operation::Mstore8 => vec![Opcode::MSTORE8 as u8],
+            Operation::CalldataLoad => vec![Opcode::CALLDATALOAD as u8],
             Operation::CallDataSize => vec![Opcode::CALLDATASIZE as u8],
         }
     }
@@ -679,6 +682,7 @@ impl Program {
                 Opcode::REVERT => Operation::Revert,
                 Opcode::MSTORE => Operation::Mstore,
                 Opcode::MSTORE8 => Operation::Mstore8,
+                Opcode::CALLDATALOAD => Operation::CalldataLoad,
                 Opcode::CALLDATASIZE => Operation::CallDataSize,
             };
             operations.push(op);
