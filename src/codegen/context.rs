@@ -491,6 +491,110 @@ impl<'c> OperationCtx<'c> {
         )
     }
 
+    pub(crate) fn append_log_syscall(
+        &'c self,
+        block: &'c Block,
+        data: Value<'c, 'c>,
+        size: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::append_log_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            block,
+            data,
+            size,
+            location,
+        );
+    }
+
+    pub(crate) fn append_log_with_one_topic_syscall(
+        &'c self,
+        block: &'c Block,
+        data: Value<'c, 'c>,
+        size: Value<'c, 'c>,
+        topic: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::append_log_with_one_topic_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            block,
+            data,
+            size,
+            topic,
+            location,
+        );
+    }
+
+    pub(crate) fn append_log_with_two_topics_syscall(
+        &'c self,
+        block: &'c Block,
+        data: Value<'c, 'c>,
+        size: Value<'c, 'c>,
+        topic1_ptr: Value<'c, 'c>,
+        topic2_ptr: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::append_log_with_two_topics_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            block,
+            data,
+            size,
+            topic1_ptr,
+            topic2_ptr,
+            location,
+        );
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn append_log_with_three_topics_syscall(
+        &'c self,
+        block: &'c Block,
+        data: Value<'c, 'c>,
+        size: Value<'c, 'c>,
+        topic1_ptr: Value<'c, 'c>,
+        topic2_ptr: Value<'c, 'c>,
+        topic3_ptr: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::append_log_with_three_topics_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            block,
+            data,
+            size,
+            topic1_ptr,
+            topic2_ptr,
+            topic3_ptr,
+            location,
+        );
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn append_log_with_four_topics_syscall(
+        &'c self,
+        block: &'c Block,
+        data: Value<'c, 'c>,
+        size: Value<'c, 'c>,
+        topic1_ptr: Value<'c, 'c>,
+        topic2_ptr: Value<'c, 'c>,
+        topic3_ptr: Value<'c, 'c>,
+        topic4_ptr: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::append_log_with_four_topics_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            block,
+            data,
+            size,
+            topic1_ptr,
+            topic2_ptr,
+            topic3_ptr,
+            topic4_ptr,
+            location,
+        );
+    }
     #[allow(unused)]
     pub(crate) fn get_calldata_ptr_syscall(
         &'c self,
