@@ -1,4 +1,4 @@
-.PHONY: check-deps deps lint fmt test usage revm-comparison
+.PHONY: check-deps deps lint fmt test usage revm-comparison build-revm-comparison
 
 #
 # Environment detection.
@@ -51,12 +51,7 @@ test:
 	cargo nextest run --workspace --all-features
 
 revm-comparison:
-	cd bench/revm_comparison && \
-		cargo build --release \
-		--bin evm_mlir_factorial \
-		--bin revm_factorial \
-		--bin evm_mlir_fibonacci \
-		--bin revm_fibonacci
+	$(MAKE) build-revm-comparison
 	@echo
 	@printf "%s" "evm_mlir_factorial result: "
 	@target/release/evm_mlir_factorial 1
@@ -74,6 +69,14 @@ revm-comparison:
 		-n "evm_mlir_fibonacci" "target/release/evm_mlir_fibonacci 100000" \
 		-n "revm_fibonacci" "target/release/revm_fibonacci 100000"
 	@echo
+
+build-revm-comparison:
+	cd bench/revm_comparison && \
+		cargo build --release \
+		--bin evm_mlir_factorial \
+		--bin revm_factorial \
+		--bin evm_mlir_fibonacci \
+		--bin revm_fibonacci
 
 ###### Ethereum tests ######
 
