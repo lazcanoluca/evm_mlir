@@ -66,7 +66,9 @@ pub fn generate_code_for_op<'c>(
         Operation::Shl => codegen_shl(op_ctx, region),
         Operation::Sar => codegen_sar(op_ctx, region),
         Operation::Codesize => codegen_codesize(op_ctx, region),
+        Operation::Gasprice => codegen_gasprice(op_ctx, region),
         Operation::Number => codegen_number(op_ctx, region),
+        Operation::Chainid => codegen_chaind(op_ctx, region),
         Operation::Pop => codegen_pop(op_ctx, region),
         Operation::Mload => codegen_mload(op_ctx, region),
         Operation::Jump => codegen_jump(op_ctx, region),
@@ -86,7 +88,6 @@ pub fn generate_code_for_op<'c>(
         Operation::CalldataLoad => codegen_calldataload(op_ctx, region),
         Operation::CallDataSize => codegen_calldatasize(op_ctx, region),
         Operation::Callvalue => codegen_callvalue(op_ctx, region),
-        Operation::Gasprice => codegen_gasprice(op_ctx, region),
     }
 }
 
@@ -3209,5 +3210,40 @@ fn codegen_gasprice<'c, 'r>(
 
     stack_push(context, &ok_block, gasprice)?;
 
+    Ok((start_block, ok_block))
+}
+
+fn codegen_chaind<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+    // Check there's enough elements in stack
+    let stack_size_flag = check_stack_has_space_for(context, &start_block, 1)?;
+    let gas_flag = consume_gas(context, &start_block, gas_cost::CHAINID)?;
+    let ok_flag = start_block
+        .append_operation(arith::andi(stack_size_flag, gas_flag, location))
+        .result(0)?
+        .into();
+    let ok_block = region.append_block(Block::new(&[]));
+    start_block.append_operation(cf::cond_br(
+        context,
+        ok_flag,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+    let chainid = op_ctx.get_chainid_syscall(&ok_block, location)?;
+    let uint256 = IntegerType::new(context, 256);
+    // Convert calldata_size from u32 to u256
+    let chainid = ok_block
+        .append_operation(arith::extui(chainid, uint256.into(), location))
+        .result(0)?
+        .into();
+    stack_push(context, &ok_block, chainid)?;
     Ok((start_block, ok_block))
 }
