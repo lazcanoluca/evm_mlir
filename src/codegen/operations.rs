@@ -20,7 +20,7 @@ use crate::{
     syscall::ExitStatusCode,
     utils::{
         allocate_and_store_value, check_if_zero, check_stack_has_at_least,
-        check_stack_has_space_for, compare_values, compute_log_dynamic_gas,
+        check_stack_has_space_for, compare_values, compute_copy_cost, compute_log_dynamic_gas,
         constant_value_from_i64, consume_gas, consume_gas_as_value, extend_memory,
         get_block_number, get_nth_from_stack, get_remaining_gas, get_stack_pointer,
         inc_stack_pointer, integer_constant_from_i64, llvm_mlir, return_empty_result,
@@ -2854,6 +2854,10 @@ fn codegen_mcopy<'c, 'r>(
         )
         .into(),
     );
+
+    let dynamic_gas = compute_copy_cost(op_ctx, &memory_access_block, size)?;
+
+    consume_gas_as_value(context, &memory_access_block, dynamic_gas)?;
 
     Ok((start_block, memory_access_block))
 }
