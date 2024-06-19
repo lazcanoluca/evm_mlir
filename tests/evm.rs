@@ -1,11 +1,12 @@
 use evm_mlir::{
     constants::gas_cost,
-    primitives::{Bytes, U256 as EU256},
+    primitives::{Address, Bytes, U256 as EU256},
     program::{Operation, Program},
     syscall::{Log, U256},
     Env, Evm,
 };
 use num_bigint::BigUint;
+use std::str::FromStr;
 
 fn run_program_assert_result(
     mut operations: Vec<Operation>,
@@ -112,6 +113,38 @@ fn fibonacci_example() {
     assert!(&result.is_success());
     let number = BigUint::from_bytes_be(result.return_data().unwrap());
     assert_eq!(number, 55_u32.into());
+}
+
+#[test]
+fn test_opcode_origin() {
+    let operations = vec![Operation::Origin];
+    let mut env = Env::default();
+    let caller = Address::from_str("0x9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
+    env.tx.caller = caller;
+    let caller_bytes = &caller.to_fixed_bytes();
+    //We extend the result to be 32 bytes long.
+    let expected_result: [u8; 32] = [&[0u8; 12], &caller_bytes[0..20]]
+        .concat()
+        .try_into()
+        .unwrap();
+    run_program_assert_result(operations, env, BigUint::from_bytes_be(&expected_result));
+}
+
+#[test]
+fn test_opcode_origin_gas_check() {
+    let operations = vec![Operation::Origin];
+
+    let needed_gas = gas_cost::ORIGIN;
+    let env = Env::default();
+    run_program_assert_gas_exact(operations, env, needed_gas as _);
+}
+
+#[test]
+fn test_opcode_origin_with_stack_overflow() {
+    let mut program = vec![Operation::Push0; 1024];
+    program.push(Operation::Origin);
+    let env = Env::default();
+    run_program_assert_halt(program, env);
 }
 
 #[test]
