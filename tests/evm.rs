@@ -749,6 +749,33 @@ fn callvalue_stack_overflow() {
 }
 
 #[test]
+fn basefee() {
+    let program = vec![Operation::Basefee];
+    let mut env = Env::default();
+    let basefee = 10_u8;
+    let expected_result = BigUint::from(basefee);
+    env.block.basefee = EU256::from(basefee);
+
+    run_program_assert_num_result(program, env, expected_result);
+}
+
+#[test]
+fn basefee_gas_check() {
+    let program = vec![Operation::Basefee];
+    let needed_gas = gas_cost::BASEFEE;
+    let env = Env::default();
+    run_program_assert_gas_exact(program, env, needed_gas as _);
+}
+
+#[test]
+fn basefee_stack_overflow() {
+    let mut program = vec![Operation::Push0; 1024];
+    program.push(Operation::Basefee);
+    let env = Env::default();
+    run_program_assert_halt(program, env);
+}
+
+#[test]
 fn block_number_check() {
     let program = vec![Operation::Number];
     let mut env = Env::default();

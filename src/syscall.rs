@@ -332,6 +332,11 @@ impl<'c> SyscallContext<'c> {
         let log = Log { data, topics };
         self.inner_context.logs.push(log);
     }
+
+    pub extern "C" fn store_in_basefee_ptr(&self, basefee: &mut U256) {
+        basefee.hi = (self.env.block.basefee >> 128).low_u128();
+        basefee.lo = self.env.block.basefee.low_u128();
+    }
 }
 
 pub mod symbols {
@@ -346,6 +351,7 @@ pub mod symbols {
     pub const GET_CALLDATA_PTR: &str = "evm_mlir__get_calldata_ptr";
     pub const GET_CALLDATA_SIZE: &str = "evm_mlir__get_calldata_size";
     pub const STORE_IN_CALLVALUE_PTR: &str = "evm_mlir__store_in_callvalue_ptr";
+    pub const STORE_IN_BASEFEE_PTR: &str = "evm_mlir__store_in_basefee_ptr";
     pub const STORE_IN_CALLER_PTR: &str = "evm_mlir__store_in_caller_ptr";
     pub const GET_ORIGIN: &str = "evm_mlir__get_origin";
     pub const GET_CHAINID: &str = "evm_mlir__get_chainid";
@@ -424,6 +430,10 @@ pub fn register_syscalls(engine: &ExecutionEngine) {
         engine.register_symbol(
             symbols::STORE_IN_CALLVALUE_PTR,
             SyscallContext::store_in_callvalue_ptr as *const fn(*mut c_void, *mut U256) as *mut (),
+        );
+        engine.register_symbol(
+            symbols::STORE_IN_BASEFEE_PTR,
+            SyscallContext::store_in_basefee_ptr as *const fn(*mut c_void, *mut U256) as *mut (),
         );
         engine.register_symbol(
             symbols::STORE_IN_CALLER_PTR,
@@ -637,6 +647,15 @@ pub(crate) mod mlir {
         module.body().append_operation(func::func(
             context,
             StringAttribute::new(context, symbols::GET_BLOCK_NUMBER),
+            TypeAttribute::new(FunctionType::new(context, &[ptr_type, ptr_type], &[]).into()),
+            Region::new(),
+            attributes,
+            location,
+        ));
+
+        module.body().append_operation(func::func(
+            context,
+            StringAttribute::new(context, symbols::STORE_IN_BASEFEE_PTR),
             TypeAttribute::new(FunctionType::new(context, &[ptr_type, ptr_type], &[]).into()),
             Region::new(),
             attributes,
@@ -954,5 +973,24 @@ pub(crate) mod mlir {
             &[],
             location,
         ));
+    }
+
+    #[allow(unused)]
+    pub(crate) fn store_in_basefee_ptr_syscall<'c>(
+        mlir_ctx: &'c MeliorContext,
+        syscall_ctx: Value<'c, 'c>,
+        basefee_ptr: Value<'c, 'c>,
+        block: &'c Block,
+        location: Location<'c>,
+    ) {
+        block
+            .append_operation(func::call(
+                mlir_ctx,
+                FlatSymbolRefAttribute::new(mlir_ctx, symbols::STORE_IN_BASEFEE_PTR),
+                &[syscall_ctx, basefee_ptr],
+                &[],
+                location,
+            ))
+            .result(0);
     }
 }

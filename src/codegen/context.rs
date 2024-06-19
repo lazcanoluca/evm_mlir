@@ -709,4 +709,20 @@ impl<'c> OperationCtx<'c> {
             location,
         )
     }
+
+    #[allow(unused)]
+    pub(crate) fn store_in_basefee_ptr_syscall(
+        &'c self,
+        basefee_ptr: Value<'c, 'c>,
+        block: &'c Block,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::store_in_basefee_ptr_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            basefee_ptr,
+            block,
+            location,
+        )
+    }
 }

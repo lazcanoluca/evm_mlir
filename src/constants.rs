@@ -45,6 +45,7 @@ pub mod gas_cost {
     pub const GASPRICE: i64 = 2;
     pub const NUMBER: i64 = 2;
     pub const CHAINID: i64 = 2;
+    pub const BASEFEE: i64 = 2;
     pub const POP: i64 = 2;
     pub const MLOAD: i64 = 3;
     pub const MSTORE: i64 = 3;
