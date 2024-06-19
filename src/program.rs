@@ -297,6 +297,7 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::LOG4 as u8 => Opcode::LOG4,
             x if x == Opcode::RETURN as u8 => Opcode::RETURN,
             x if x == Opcode::REVERT as u8 => Opcode::REVERT,
+            x if x == Opcode::ORIGIN as u8 => Opcode::ORIGIN,
             x => return Err(OpcodeParseError(x)),
         };
 
@@ -418,7 +419,7 @@ impl Operation {
             Operation::Revert => vec![Opcode::REVERT as u8],
             Operation::Mstore => vec![Opcode::MSTORE as u8],
             Operation::Mstore8 => vec![Opcode::MSTORE8 as u8],
-            Operation::Log(n) => vec![Opcode::LOG0 as u8 + n - 1],
+            Operation::Log(n) => vec![Opcode::LOG0 as u8 + n],
             Operation::Origin => vec![Opcode::ORIGIN as u8],
         }
     }
@@ -752,6 +753,13 @@ impl Program {
                 _ => 1,
             })
             .sum()
+    }
+
+    pub fn to_bytecode(self) -> Vec<u8> {
+        self.operations
+            .iter()
+            .flat_map(Operation::to_bytecode)
+            .collect::<Vec<u8>>()
     }
 }
 
