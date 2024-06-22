@@ -48,6 +48,7 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x37) CALLDATACOPY
 1. (0x38) CODESIZE
 1. (0x3A) GASPRICE
+1. (0x41) COINBASE
 1. (0x46) CHAINID
 1. (0x48) BASEFEE
 1. (0x50) POP
@@ -150,7 +151,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0x3E) RETURNDATACOPY
 1. (0x3F) EXTCODEHASH
 1. (0x40) BLOCKHASH
-1. (0x41) COINBASE
 1. (0x42) TIMESTAMP
 1. (0x43) NUMBER
 1. (0x44) DIFFICULTY
