@@ -1302,3 +1302,30 @@ fn blobbasefee_stack_overflow() {
     let (env, db) = default_env_and_db_setup(program);
     run_program_assert_halt(env, db);
 }
+
+#[test]
+fn gaslimit_happy_path() {
+    let gaslimit: u64 = 300;
+    let mut operations = vec![Operation::Gaslimit];
+    append_return_result_operations(&mut operations);
+    let (mut env, db) = default_env_and_db_setup(operations);
+    env.tx.gas_limit = gaslimit;
+    let expected_result = BigUint::from(gaslimit);
+    run_program_assert_num_result(env, db, expected_result);
+}
+
+#[test]
+fn gaslimit_gas_check() {
+    let operations = vec![Operation::Gaslimit];
+    let needed_gas = gas_cost::GASLIMIT;
+    let env = Env::default();
+    run_program_assert_gas_exact(operations, env, needed_gas as _);
+}
+
+#[test]
+fn gaslimit_stack_overflow() {
+    let mut program = vec![Operation::Push0; 1024];
+    program.push(Operation::Gaslimit);
+    let (env, db) = default_env_and_db_setup(program);
+    run_program_assert_halt(env, db);
+}

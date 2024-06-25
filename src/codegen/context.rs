@@ -591,6 +591,14 @@ impl<'c> OperationCtx<'c> {
         )
     }
 
+    pub(crate) fn get_gaslimit(
+        &'c self,
+        block: &'c Block,
+        location: Location<'c>,
+    ) -> Result<Value, CodegenError> {
+        syscall::mlir::get_gaslimit(self.mlir_context, self.syscall_ctx, block, location)
+    }
+
     pub(crate) fn store_in_selfbalance_ptr(
         &'c self,
         block: &'c Block,
