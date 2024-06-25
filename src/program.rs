@@ -34,8 +34,8 @@ pub enum Opcode {
     // unused 0x1E-0x1F
     KECCAK256 = 0x20,
     // unused 0x21-0x2F
-    BALANCE = 0x31,
     ADDRESS = 0x30,
+    BALANCE = 0x31,
     ORIGIN = 0x32,
     CALLER = 0x33,
     CALLVALUE = 0x34,
@@ -57,7 +57,7 @@ pub enum Opcode {
     // DIFFICULTY = 0x44,
     // GASLIMIT = 0x45,
     CHAINID = 0x46,
-    // SELFBALANCE = 0x47,
+    SELFBALANCE = 0x47,
     BASEFEE = 0x48,
     // BLOBHASH = 0x49,
     // BLOBBASEFEE = 0x4A,
@@ -207,6 +207,7 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::SHL as u8 => Opcode::SHL,
             x if x == Opcode::SHR as u8 => Opcode::SHR,
             x if x == Opcode::SAR as u8 => Opcode::SAR,
+            x if x == Opcode::ADDRESS as u8 => Opcode::ADDRESS,
             x if x == Opcode::BALANCE as u8 => Opcode::BALANCE,
             x if x == Opcode::ORIGIN as u8 => Opcode::ORIGIN,
             x if x == Opcode::CALLER as u8 => Opcode::CALLER,
@@ -220,6 +221,7 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::GASPRICE as u8 => Opcode::GASPRICE,
             x if x == Opcode::NUMBER as u8 => Opcode::NUMBER,
             x if x == Opcode::CHAINID as u8 => Opcode::CHAINID,
+            x if x == Opcode::SELFBALANCE as u8 => Opcode::SELFBALANCE,
             x if x == Opcode::BASEFEE as u8 => Opcode::BASEFEE,
             x if x == Opcode::POP as u8 => Opcode::POP,
             x if x == Opcode::MLOAD as u8 => Opcode::MLOAD,
@@ -307,7 +309,6 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::CODECOPY as u8 => Opcode::CODECOPY,
             x if x == Opcode::NOT as u8 => Opcode::NOT,
             x if x == Opcode::REVERT as u8 => Opcode::REVERT,
-            x if x == Opcode::ADDRESS as u8 => Opcode::ADDRESS,
             x => return Err(OpcodeParseError(x)),
         };
 
@@ -342,7 +343,9 @@ pub enum Operation {
     Shr,
     Shl,
     Sar,
+    Address,
     Balance,
+    Origin,
     Caller,
     Callvalue,
     CalldataLoad,
@@ -353,6 +356,7 @@ pub enum Operation {
     Gasprice,
     Number,
     Chainid,
+    SelfBalance,
     Basefee,
     Pop,
     Mload,
@@ -377,8 +381,6 @@ pub enum Operation {
     CallDataCopy,
     Log(u8),
     Codecopy,
-    Address,
-    Origin,
 }
 
 impl Operation {
@@ -408,6 +410,7 @@ impl Operation {
             Operation::Shr => vec![Opcode::SHR as u8],
             Operation::Shl => vec![Opcode::SHL as u8],
             Operation::Sar => vec![Opcode::SAR as u8],
+            Operation::Address => vec![Opcode::ADDRESS as u8],
             Operation::Balance => vec![Opcode::BALANCE as u8],
             Operation::Origin => vec![Opcode::ORIGIN as u8],
             Operation::Caller => vec![Opcode::CALLER as u8],
@@ -421,6 +424,7 @@ impl Operation {
             Operation::Gasprice => vec![Opcode::GASPRICE as u8],
             Operation::Number => vec![Opcode::NUMBER as u8],
             Operation::Chainid => vec![Opcode::CHAINID as u8],
+            Operation::SelfBalance => vec![Opcode::SELFBALANCE as u8],
             Operation::Basefee => vec![Opcode::BASEFEE as u8],
             Operation::Pop => vec![Opcode::POP as u8],
             Operation::Mload => vec![Opcode::MLOAD as u8],
@@ -452,7 +456,6 @@ impl Operation {
             Operation::Revert => vec![Opcode::REVERT as u8],
             Operation::Keccak256 => vec![Opcode::KECCAK256 as u8],
             Operation::Codecopy => vec![Opcode::CODECOPY as u8],
-            Operation::Address => vec![Opcode::ADDRESS as u8],
         }
     }
 }
@@ -508,6 +511,7 @@ impl Program {
                 Opcode::SHR => Operation::Shr,
                 Opcode::SHL => Operation::Shl,
                 Opcode::SAR => Operation::Sar,
+                Opcode::ADDRESS => Operation::Address,
                 Opcode::BALANCE => Operation::Balance,
                 Opcode::ORIGIN => Operation::Origin,
                 Opcode::CALLER => Operation::Caller,
@@ -521,6 +525,7 @@ impl Program {
                 Opcode::GASPRICE => Operation::Gasprice,
                 Opcode::NUMBER => Operation::Number,
                 Opcode::CHAINID => Operation::Chainid,
+                Opcode::SELFBALANCE => Operation::SelfBalance,
                 Opcode::BASEFEE => Operation::Basefee,
                 Opcode::POP => Operation::Pop,
                 Opcode::MSTORE => Operation::Mstore,
@@ -767,7 +772,6 @@ impl Program {
                 Opcode::LOG3 => Operation::Log(3),
                 Opcode::LOG4 => Operation::Log(4),
                 Opcode::CODECOPY => Operation::Codecopy,
-                Opcode::ADDRESS => Operation::Address,
                 Opcode::RETURN => Operation::Return,
                 Opcode::REVERT => Operation::Revert,
             };
