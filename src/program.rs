@@ -32,7 +32,7 @@ pub enum Opcode {
     SHR = 0x1C,
     SAR = 0x1D,
     // unused 0x1E-0x1F
-    // KECCAK256 = 0x20,
+    KECCAK256 = 0x20,
     // unused 0x21-0x2F
     BALANCE = 0x31,
     ADDRESS = 0x30,
@@ -370,6 +370,7 @@ pub enum Operation {
     Revert,
     Mstore,
     Mstore8,
+    Keccak256,
     Not,
     CallDataCopy,
     Log(u8),
@@ -446,6 +447,7 @@ impl Operation {
             Operation::Log(n) => vec![Opcode::LOG0 as u8 + n],
             Operation::Return => vec![Opcode::RETURN as u8],
             Operation::Revert => vec![Opcode::REVERT as u8],
+            Operation::Keccak256 => vec![Opcode::KECCAK256 as u8],
             Operation::Codecopy => vec![Opcode::CODECOPY as u8],
             Operation::Address => vec![Opcode::ADDRESS as u8],
         }
@@ -754,6 +756,7 @@ impl Program {
                 Opcode::SWAP14 => Operation::Swap(14),
                 Opcode::SWAP15 => Operation::Swap(15),
                 Opcode::SWAP16 => Operation::Swap(16),
+                Opcode::KECCAK256 => Operation::Keccak256,
                 Opcode::LOG0 => Operation::Log(0),
                 Opcode::LOG1 => Operation::Log(1),
                 Opcode::LOG2 => Operation::Log(2),
