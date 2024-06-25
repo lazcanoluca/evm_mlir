@@ -66,6 +66,7 @@ pub mod gas_cost {
     pub const PUSHN: i64 = 3;
     pub const DUPN: i64 = 3;
     pub const SWAPN: i64 = 3;
+    pub const TIMESTAMP: i64 = 2;
     pub const KECCAK256: i64 = 30;
     pub const CODECOPY: i64 = 3;
     pub const LOG: i64 = 375;

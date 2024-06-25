@@ -852,6 +852,34 @@ fn coinbase_stack_overflow() {
 }
 
 #[test]
+fn timestamp_happy_path() {
+    let timestamp: u64 = 1234567890;
+    let operations = vec![Operation::Timestamp];
+    let mut env = Env::default();
+    env.block.timestamp = timestamp.into();
+
+    let expected_result = BigUint::from(timestamp);
+
+    run_program_assert_num_result(operations, env, expected_result);
+}
+
+#[test]
+fn timestamp_gas_check() {
+    let operations = vec![Operation::Timestamp];
+    let needed_gas = gas_cost::TIMESTAMP;
+    let env = Env::default();
+    run_program_assert_gas_exact(operations, env, needed_gas as _);
+}
+
+#[test]
+fn timestamp_stack_overflow() {
+    let mut program = vec![Operation::Push0; 1024];
+    program.push(Operation::Timestamp);
+    let env = Env::default();
+    run_program_assert_halt(program, env);
+}
+
+#[test]
 fn basefee() {
     let program = vec![Operation::Basefee];
     let mut env = Env::default();
