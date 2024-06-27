@@ -913,6 +913,36 @@ fn block_number_with_stack_overflow() {
 }
 
 #[test]
+fn sstore_with_stack_underflow() {
+    let program = vec![Operation::Push0, Operation::Sstore];
+    let (env, db) = default_env_and_db_setup(program);
+
+    run_program_assert_halt(env, db);
+}
+
+#[test]
+fn sstore_happy_path() {
+    let key = 80_u8;
+    let value = 11_u8;
+    let operations = vec![
+        Operation::Push((1_u8, BigUint::from(value))),
+        Operation::Push((1_u8, BigUint::from(key))),
+        Operation::Sstore,
+    ];
+
+    let (mut env, db) = default_env_and_db_setup(operations);
+    let caller_address = Address::from_low_u64_be(41);
+    env.tx.caller = caller_address;
+    let mut evm = Evm::new(env, db);
+
+    let result = evm.transact().unwrap().result;
+    assert!(&result.is_success());
+
+    let stored_value = evm.db.read_storage(caller_address, EU256::from(key));
+    assert_eq!(stored_value, EU256::from(value));
+}
+
+#[test]
 fn gasprice_happy_path() {
     let gas_price: u32 = 33192;
     let mut operations = vec![Operation::Gasprice];

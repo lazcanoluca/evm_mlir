@@ -20,8 +20,9 @@ use std::ffi::c_void;
 use crate::{
     db::{AccountInfo, Database, Db},
     env::{Env, TransactTo},
-    primitives::{Address, U256 as EU256},
+    primitives::Address,
     result::{EVMError, ExecutionResult, HaltReason, Output, ResultAndState, SuccessReason},
+    utils::u256_from_u128,
 };
 use melior::ExecutionEngine;
 use sha3::{Digest, Keccak256};
@@ -312,12 +313,21 @@ impl<'c> SyscallContext<'c> {
     pub extern "C" fn read_storage(&mut self, stg_key: &U256, stg_value: &mut U256) {
         let address = self.env.tx.caller;
 
-        let key = ((EU256::from(stg_key.hi)) << 128) + stg_key.lo;
+        let key = u256_from_u128(stg_key.hi, stg_key.lo);
 
         let result = self.db.read_storage(address, key);
 
         stg_value.hi = (result >> 128).low_u128();
         stg_value.lo = result.low_u128();
+    }
+
+    pub extern "C" fn write_storage(&mut self, stg_key: &U256, stg_value: &U256) {
+        let address = self.env.tx.caller;
+
+        let key = u256_from_u128(stg_key.hi, stg_key.lo);
+        let value = u256_from_u128(stg_value.hi, stg_value.lo);
+
+        self.db.write_storage(address, key, value);
     }
 
     pub extern "C" fn append_log(&mut self, offset: u32, size: u32) {
@@ -430,6 +440,7 @@ pub mod symbols {
     pub const WRITE_RESULT: &str = "evm_mlir__write_result";
     pub const EXTEND_MEMORY: &str = "evm_mlir__extend_memory";
     pub const KECCAK256_HASHER: &str = "evm_mlir__keccak256_hasher";
+    pub const STORAGE_WRITE: &str = "evm_mlir__write_storage";
     pub const STORAGE_READ: &str = "evm_mlir__read_storage";
     pub const APPEND_LOG: &str = "evm_mlir__append_log";
     pub const APPEND_LOG_ONE_TOPIC: &str = "evm_mlir__append_log_with_one_topic";
@@ -476,6 +487,11 @@ pub fn register_syscalls(engine: &ExecutionEngine) {
         engine.register_symbol(
             symbols::STORAGE_READ,
             SyscallContext::read_storage as *const fn(*const c_void, *const U256, *mut U256)
+                as *mut (),
+        );
+        engine.register_symbol(
+            symbols::STORAGE_WRITE,
+            SyscallContext::write_storage as *const fn(*mut c_void, *const U256, *const U256)
                 as *mut (),
         );
         engine.register_symbol(
@@ -746,6 +762,17 @@ pub(crate) mod mlir {
         module.body().append_operation(func::func(
             context,
             StringAttribute::new(context, symbols::STORAGE_READ),
+            r#TypeAttribute::new(
+                FunctionType::new(context, &[ptr_type, ptr_type, ptr_type], &[]).into(),
+            ),
+            Region::new(),
+            attributes,
+            location,
+        ));
+
+        module.body().append_operation(func::func(
+            context,
+            StringAttribute::new(context, symbols::STORAGE_WRITE),
             r#TypeAttribute::new(
                 FunctionType::new(context, &[ptr_type, ptr_type, ptr_type], &[]).into(),
             ),
@@ -1116,6 +1143,24 @@ pub(crate) mod mlir {
         block.append_operation(func::call(
             mlir_ctx,
             FlatSymbolRefAttribute::new(mlir_ctx, symbols::STORAGE_READ),
+            &[syscall_ctx, key, value],
+            &[],
+            location,
+        ));
+    }
+
+    /// Writes the storage given a key value pair
+    pub(crate) fn storage_write_syscall<'c>(
+        mlir_ctx: &'c MeliorContext,
+        syscall_ctx: Value<'c, 'c>,
+        block: &'c Block,
+        key: Value<'c, 'c>,
+        value: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        block.append_operation(func::call(
+            mlir_ctx,
+            FlatSymbolRefAttribute::new(mlir_ctx, symbols::STORAGE_WRITE),
             &[syscall_ctx, key, value],
             &[],
             location,
