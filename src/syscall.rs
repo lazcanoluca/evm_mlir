@@ -406,6 +406,12 @@ impl<'c> SyscallContext<'c> {
         self.inner_context.logs.push(log);
     }
 
+    pub extern "C" fn get_codesize_from_address(&mut self, address: &U256) -> u64 {
+        Address::try_from(address)
+            .map(|a| self.db.code_by_address(a).len())
+            .unwrap_or(0) as _
+    }
+
     pub extern "C" fn get_address_ptr(&mut self) -> *const u8 {
         self.env.tx.get_address().to_fixed_bytes().as_ptr()
     }
@@ -497,6 +503,7 @@ pub mod symbols {
     pub const APPEND_LOG_FOUR_TOPICS: &str = "evm_mlir__append_log_with_four_topics";
     pub const GET_CALLDATA_PTR: &str = "evm_mlir__get_calldata_ptr";
     pub const GET_CALLDATA_SIZE: &str = "evm_mlir__get_calldata_size";
+    pub const GET_CODESIZE_FROM_ADDRESS: &str = "evm_mlir__get_codesize_from_address";
     pub const COPY_CODE_TO_MEMORY: &str = "evm_mlir__copy_code_to_memory";
     pub const GET_ADDRESS_PTR: &str = "evm_mlir__get_address_ptr";
     pub const GET_GASLIMIT: &str = "evm_mlir__get_gaslimit";
@@ -610,6 +617,11 @@ pub fn register_syscalls(engine: &ExecutionEngine) {
             symbols::STORE_IN_BLOBBASEFEE_PTR,
             SyscallContext::store_in_blobbasefee_ptr
                 as *const extern "C" fn(&SyscallContext, *mut U256) -> () as *mut (),
+        );
+        engine.register_symbol(
+            symbols::GET_CODESIZE_FROM_ADDRESS,
+            SyscallContext::get_codesize_from_address as *const fn(*mut c_void, *mut U256)
+                as *mut (),
         );
         engine.register_symbol(
             symbols::GET_COINBASE_PTR,
@@ -929,6 +941,14 @@ pub(crate) mod mlir {
             context,
             StringAttribute::new(context, symbols::GET_BLOCK_NUMBER),
             TypeAttribute::new(FunctionType::new(context, &[ptr_type, ptr_type], &[]).into()),
+            Region::new(),
+            attributes,
+            location,
+        ));
+        module.body().append_operation(func::func(
+            context,
+            StringAttribute::new(context, symbols::GET_CODESIZE_FROM_ADDRESS),
+            TypeAttribute::new(FunctionType::new(context, &[ptr_type, ptr_type], &[uint64]).into()),
             Region::new(),
             attributes,
             location,
@@ -1530,7 +1550,6 @@ pub(crate) mod mlir {
         ));
     }
 
-    #[allow(unused)]
     pub(crate) fn get_prevrandao_syscall<'c>(
         mlir_ctx: &'c MeliorContext,
         syscall_ctx: Value<'c, 'c>,
@@ -1545,5 +1564,25 @@ pub(crate) mod mlir {
             &[],
             location,
         ));
+    }
+
+    pub(crate) fn get_codesize_from_address_syscall<'c>(
+        mlir_ctx: &'c MeliorContext,
+        syscall_ctx: Value<'c, 'c>,
+        block: &'c Block,
+        address: Value<'c, 'c>,
+        location: Location<'c>,
+    ) -> Result<Value<'c, 'c>, CodegenError> {
+        let uint64 = IntegerType::new(mlir_ctx, 64).into();
+        let value = block
+            .append_operation(func::call(
+                mlir_ctx,
+                FlatSymbolRefAttribute::new(mlir_ctx, symbols::GET_CODESIZE_FROM_ADDRESS),
+                &[syscall_ctx, address],
+                &[uint64],
+                location,
+            ))
+            .result(0)?;
+        Ok(value.into())
     }
 }
