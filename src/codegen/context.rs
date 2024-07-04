@@ -970,6 +970,21 @@ impl<'c> OperationCtx<'c> {
         )
     }
 
+    pub(crate) fn get_block_hash_syscall(
+        &'c self,
+        block: &'c Block,
+        block_number: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        syscall::mlir::get_block_hash_syscall(
+            self.mlir_context,
+            self.syscall_ctx,
+            block,
+            block_number,
+            location,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn call_syscall(
         &'c self,

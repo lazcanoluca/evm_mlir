@@ -23,7 +23,7 @@ use crate::{
     db::{AccountInfo, Database, Db},
     env::{Env, TransactTo},
     executor::{Executor, OptLevel},
-    primitives::{Address, Bytes, U256 as EU256},
+    primitives::{Address, Bytes, B256, U256 as EU256},
     program::Program,
     result::{EVMError, ExecutionResult, HaltReason, Output, ResultAndState, SuccessReason},
     state::EvmStorageSlot,
@@ -50,7 +50,7 @@ impl U256 {
         U256 { hi, lo }
     }
 
-    pub fn copy_from_address(&mut self, value: &Address) {
+    pub fn copy_from(&mut self, value: &Address) {
         let mut buffer = [0u8; 32];
         buffer[12..32].copy_from_slice(&value.0);
         self.lo = u128::from_be_bytes(buffer[16..32].try_into().unwrap());
@@ -455,7 +455,7 @@ impl<'c> SyscallContext<'c> {
 
     pub extern "C" fn get_origin(&self, address: &mut U256) {
         let aux = &self.env.tx.caller;
-        address.copy_from_address(aux);
+        address.copy_from(aux);
     }
 
     pub extern "C" fn extend_memory(&mut self, new_size: u32) -> *mut u8 {
@@ -650,6 +650,24 @@ impl<'c> SyscallContext<'c> {
         number.lo = block_number.low_u128();
     }
 
+    pub extern "C" fn get_block_hash(&mut self, number: &mut U256) {
+        let number_as_u256 = u256_from_u128(number.hi, number.lo);
+
+        // If number is not in the valid range (last 256 blocks), return zero.
+        let hash = if number_as_u256 < self.env.block.number.saturating_sub(EU256::from(256))
+            || number_as_u256 >= self.env.block.number
+        {
+            // TODO: check if this is necessary. Db should only contain last 256 blocks, so number check would not be needed.
+            B256::zero()
+        } else {
+            self.db.block_hash(number_as_u256).unwrap_or(B256::zero())
+        };
+
+        let (hi, lo) = hash.as_bytes().split_at(16);
+        number.lo = u128::from_be_bytes(lo.try_into().unwrap());
+        number.hi = u128::from_be_bytes(hi.try_into().unwrap());
+    }
+
     /// Receives a memory offset and size, and a vector of topics.
     /// Creates a Log with topics and data equal to memory[offset..offset + size]
     /// and pushes it to the logs vector.
@@ -809,6 +827,7 @@ pub mod symbols {
     pub const STORE_IN_SELFBALANCE_PTR: &str = "evm_mlir__store_in_selfbalance_ptr";
     pub const COPY_EXT_CODE_TO_MEMORY: &str = "evm_mlir__copy_ext_code_to_memory";
     pub const GET_PREVRANDAO: &str = "evm_mlir__get_prevrandao";
+    pub const GET_BLOCK_HASH: &str = "evm_mlir__get_block_hash";
     pub const CALL: &str = "evm_mlir__call";
 }
 
@@ -984,6 +1003,10 @@ pub fn register_syscalls(engine: &ExecutionEngine) {
             SyscallContext::copy_ext_code_to_memory
                 as *const extern "C" fn(*mut c_void, *mut U256, u32, u32, u32)
                 as *mut (),
+        );
+        engine.register_symbol(
+            symbols::GET_BLOCK_HASH,
+            SyscallContext::get_block_hash as *const fn(*mut c_void, *mut U256) as *mut (),
         );
     };
 }
@@ -1255,6 +1278,7 @@ pub(crate) mod mlir {
             attributes,
             location,
         ));
+
         module.body().append_operation(func::func(
             context,
             StringAttribute::new(context, symbols::GET_CODESIZE_FROM_ADDRESS),
@@ -1348,6 +1372,15 @@ pub(crate) mod mlir {
             TypeAttribute::new(
                 FunctionType::new(context, &[ptr_type, ptr_type, ptr_type], &[]).into(),
             ),
+            Region::new(),
+            attributes,
+            location,
+        ));
+
+        module.body().append_operation(func::func(
+            context,
+            StringAttribute::new(context, symbols::GET_BLOCK_HASH),
+            TypeAttribute::new(FunctionType::new(context, &[ptr_type, ptr_type], &[]).into()),
             Region::new(),
             attributes,
             location,
@@ -1983,6 +2016,22 @@ pub(crate) mod mlir {
             mlir_ctx,
             FlatSymbolRefAttribute::new(mlir_ctx, symbols::GET_BLOB_HASH_AT_INDEX),
             &[syscall_ctx, index, blobhash],
+            &[],
+            location,
+        ));
+    }
+
+    pub(crate) fn get_block_hash_syscall<'c>(
+        mlir_ctx: &'c MeliorContext,
+        syscall_ctx: Value<'c, 'c>,
+        block: &'c Block,
+        block_number: Value<'c, 'c>,
+        location: Location<'c>,
+    ) {
+        block.append_operation(func::call(
+            mlir_ctx,
+            FlatSymbolRefAttribute::new(mlir_ctx, symbols::GET_BLOCK_HASH),
+            &[syscall_ctx, block_number],
             &[],
             location,
         ));

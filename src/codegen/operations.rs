@@ -112,7 +112,60 @@ pub fn generate_code_for_op<'c>(
         Operation::Return => codegen_return(op_ctx, region),
         Operation::Revert => codegen_revert(op_ctx, region),
         Operation::Invalid => codegen_invalid(op_ctx, region),
+        Operation::BlockHash => codegen_blockhash(op_ctx, region),
     }
+}
+
+fn codegen_blockhash<'c, 'r>(
+    op_ctx: &mut OperationCtx<'c>,
+    region: &'r Region<'c>,
+) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
+    let start_block = region.append_block(Block::new(&[]));
+    let context = &op_ctx.mlir_context;
+    let location = Location::unknown(context);
+
+    let gas_flag = consume_gas(context, &start_block, gas_cost::BLOCKHASH)?;
+    let flag = check_stack_has_at_least(context, &start_block, 1)?;
+
+    let condition = start_block
+        .append_operation(arith::andi(gas_flag, flag, location))
+        .result(0)?
+        .into();
+
+    let ok_block = region.append_block(Block::new(&[]));
+
+    start_block.append_operation(cf::cond_br(
+        context,
+        condition,
+        &ok_block,
+        &op_ctx.revert_block,
+        &[],
+        &[],
+        location,
+    ));
+
+    let uint256 = IntegerType::new(context, 256);
+
+    let block_number = stack_pop(context, &ok_block)?;
+    let block_number_ptr = allocate_and_store_value(op_ctx, &ok_block, block_number, location)?;
+
+    // Syscall loads the hash into the block_number pointer
+    op_ctx.get_block_hash_syscall(&ok_block, block_number_ptr, location);
+
+    let block_hash_value = ok_block
+        .append_operation(llvm::load(
+            context,
+            block_number_ptr,
+            uint256.into(),
+            location,
+            LoadStoreOptions::default(),
+        ))
+        .result(0)?
+        .into();
+
+    stack_push(context, &ok_block, block_hash_value)?;
+
+    Ok((start_block, ok_block))
 }
 
 fn codegen_origin<'c, 'r>(

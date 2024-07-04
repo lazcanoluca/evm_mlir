@@ -31,6 +31,10 @@ impl Db {
         Self::default()
     }
 
+    pub fn insert_block_hash(&mut self, number: U256, hash: B256) {
+        self.block_hashes.insert(number, hash);
+    }
+
     pub fn set_account(
         &mut self,
         address: Address,

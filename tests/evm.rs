@@ -9,6 +9,7 @@ use evm_mlir::{
     syscall::{LogData, U256},
     Env, Evm,
 };
+
 use num_bigint::BigUint;
 
 fn append_return_result_operations(operations: &mut Vec<Operation>) {
@@ -174,6 +175,50 @@ fn fibonacci_example() {
     assert!(result.is_success());
     let number = BigUint::from_bytes_be(result.output().unwrap());
     assert_eq!(number, 55_u32.into());
+}
+
+#[test]
+fn block_hash_happy_path() {
+    let block_number = 1_u8;
+    let block_hash = 209433;
+    let current_block_number = 3_u8;
+    let expected_block_hash = BigUint::from(block_hash);
+    let mut operations = vec![
+        Operation::Push((1, BigUint::from(block_number))),
+        Operation::BlockHash,
+    ];
+    append_return_result_operations(&mut operations);
+    let (mut env, mut db) = default_env_and_db_setup(operations);
+    env.block.number = EU256::from(current_block_number);
+    db.insert_block_hash(EU256::from(block_number), B256::from_low_u64_be(block_hash));
+
+    run_program_assert_num_result(env, db, expected_block_hash);
+}
+
+#[test]
+fn block_hash_with_current_block_number() {
+    let block_number = 1_u8;
+    let block_hash = 29293;
+    let current_block_number = block_number;
+    let expected_block_hash = BigUint::ZERO;
+    let mut operations = vec![
+        Operation::Push((1, BigUint::from(block_number))),
+        Operation::BlockHash,
+    ];
+    append_return_result_operations(&mut operations);
+    let (mut env, mut db) = default_env_and_db_setup(operations);
+    env.block.number = EU256::from(current_block_number);
+    db.insert_block_hash(EU256::from(block_number), B256::from_low_u64_be(block_hash));
+
+    run_program_assert_num_result(env, db, expected_block_hash);
+}
+
+#[test]
+fn block_hash_with_stack_underflow() {
+    let operations = vec![Operation::BlockHash];
+    let (env, db) = default_env_and_db_setup(operations);
+
+    run_program_assert_halt(env, db);
 }
 
 #[test]

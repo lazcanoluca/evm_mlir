@@ -78,6 +78,7 @@ pub mod gas_cost {
     pub const KECCAK256: i64 = 30;
     pub const CODECOPY: i64 = 3;
     pub const LOG: i64 = 375;
+    pub const BLOCKHASH: i64 = 20;
     pub const CALL: i64 = 0;
     pub const EXTCODESIZE_WARM: i64 = 100;
     pub const EXTCODECOPY_WARM: i64 = 100;
