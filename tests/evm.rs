@@ -2391,3 +2391,78 @@ fn extcodehash_address_with_no_code() {
 
     run_program_assert_num_result(env, db, expected_code_hash);
 }
+
+#[test]
+fn returndatasize_happy_path() {
+    // Callee
+    let mut callee_ops = vec![Operation::Push0];
+    append_return_result_operations(&mut callee_ops);
+
+    let program = Program::from(callee_ops);
+    let (callee_address, bytecode) = (
+        Address::from_low_u64_be(8080),
+        Bytecode::from(program.to_bytecode()),
+    );
+    let db = Db::default().with_bytecode(callee_address, bytecode);
+
+    let gas = 100_u8;
+    let value = 0_u8;
+    let args_offset = 0_u8;
+    let args_size = 0_u8;
+    let ret_offset = 0_u8;
+    let ret_size = 0_u8;
+
+    let caller_address = Address::from_low_u64_be(4040);
+    let mut caller_ops = vec![
+        Operation::Push((1_u8, BigUint::from(ret_size))), //Ret size
+        Operation::Push((1_u8, BigUint::from(ret_offset))), //Ret offset
+        Operation::Push((1_u8, BigUint::from(args_size))), //Args size
+        Operation::Push((1_u8, BigUint::from(args_offset))), //Args offset
+        Operation::Push((1_u8, BigUint::from(value))),    //Value
+        Operation::Push((16_u8, BigUint::from_bytes_be(callee_address.as_bytes()))), //Address
+        Operation::Push((1_u8, BigUint::from(gas))),      //Gas
+        Operation::Call,
+        Operation::ReturnDataSize,
+    ];
+
+    append_return_result_operations(&mut caller_ops);
+
+    let program = Program::from(caller_ops);
+    let bytecode = Bytecode::from(program.to_bytecode());
+    let mut env = Env::default();
+    env.tx.transact_to = TransactTo::Call(caller_address);
+    env.tx.caller = caller_address;
+    let db = db.with_bytecode(caller_address, bytecode);
+
+    let expected_result = 32_u8.into();
+
+    run_program_assert_num_result(env, db, expected_result);
+}
+
+#[test]
+fn returndatasize_no_return_data() {
+    let caller_address = Address::from_low_u64_be(4040);
+    let mut caller_ops = vec![Operation::ReturnDataSize];
+
+    append_return_result_operations(&mut caller_ops);
+
+    let program = Program::from(caller_ops);
+    let bytecode = Bytecode::from(program.to_bytecode());
+    let mut env = Env::default();
+    env.tx.transact_to = TransactTo::Call(caller_address);
+    env.tx.caller = caller_address;
+    let db = Db::default().with_bytecode(caller_address, bytecode);
+
+    let expected_result = 0_u8.into();
+
+    run_program_assert_num_result(env, db, expected_result);
+}
+
+#[test]
+fn returndatasize_gas_check() {
+    let operations = vec![Operation::ReturnDataSize];
+    let (env, db) = default_env_and_db_setup(operations);
+    let needed_gas = gas_cost::RETURNDATASIZE as _;
+
+    run_program_assert_gas_exact_with_db(env, db, needed_gas)
+}

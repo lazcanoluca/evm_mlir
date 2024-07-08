@@ -115,6 +115,16 @@ pub struct InnerContext {
 #[derive(Debug, Default)]
 pub struct CallFrame {
     pub caller: Address,
+    last_call_return_data: Vec<u8>,
+}
+
+impl CallFrame {
+    pub fn new(caller: Address) -> Self {
+        Self {
+            caller,
+            ..Default::default()
+        }
+    }
 }
 
 /// The context passed to syscalls
@@ -229,6 +239,10 @@ impl<'c> SyscallContext<'c> {
         self.inner_context.exit_status = Some(ExitStatusCode::from_u8(execution_result));
     }
 
+    pub extern "C" fn get_return_data_size(&mut self) -> u64 {
+        self.call_frame.last_call_return_data.len() as _
+    }
+
     pub extern "C" fn call(
         &mut self,
         mut gas_to_send: u64,
@@ -339,65 +353,71 @@ impl<'c> SyscallContext<'c> {
             .expect("failed to compile program");
 
         let executor = Executor::new(&module, OptLevel::Aggressive);
-        let call_frame = CallFrame {
-            caller: new_frame_caller,
-        };
+        let call_frame = CallFrame::new(new_frame_caller);
         let mut context = SyscallContext::new(env.clone(), self.db, call_frame);
 
         executor.execute(&mut context, env.tx.gas_limit);
 
-        match context.get_result().unwrap().result {
+        let (return_code, refunded_gas, return_data) = match context.get_result().unwrap().result {
             ExecutionResult::Success {
                 gas_used, output, ..
-            } => {
-                Self::copy_exact(
-                    &mut self.inner_context.memory,
-                    output.data(),
-                    ret_offset,
-                    ret_size,
-                );
-                *consumed_gas -= gas_to_send - gas_used;
-                call_opcode::SUCCESS_RETURN_CODE
-            }
+            } => (
+                call_opcode::SUCCESS_RETURN_CODE,
+                gas_to_send - gas_used,
+                output.into_data(),
+            ),
             //TODO: If we revert, should we still send the value to the called contract?
             ExecutionResult::Revert {
                 gas_used, output, ..
-            } => {
-                Self::copy_exact(
-                    &mut self.inner_context.memory,
-                    &output,
-                    ret_offset,
-                    ret_size,
-                );
-                *consumed_gas -= gas_to_send - gas_used;
-                call_opcode::REVERT_RETURN_CODE
-            }
-            ExecutionResult::Halt { gas_used, .. } => {
-                *consumed_gas -= gas_to_send - gas_used;
-                call_opcode::REVERT_RETURN_CODE
-            }
-        }
+            } => (
+                call_opcode::REVERT_RETURN_CODE,
+                gas_to_send - gas_used,
+                output,
+            ),
+            ExecutionResult::Halt { gas_used, .. } => (
+                call_opcode::REVERT_RETURN_CODE,
+                gas_to_send - gas_used,
+                Bytes::default(),
+            ),
+        };
+
+        //TODO: This copying mechanism may be improved with a safe copy_from_slice which would
+        //reduce the need of calling return_data.to_vec()
+        self.call_frame.last_call_return_data.clear();
+        self.call_frame
+            .last_call_return_data
+            .clone_from(&return_data.to_vec());
+        Self::copy_exact(
+            &mut self.inner_context.memory,
+            &return_data,
+            ret_offset,
+            ret_size,
+        );
+        *consumed_gas -= refunded_gas;
+
+        return_code
     }
 
-    fn copy_exact(target: &mut [u8], source: &[u8], t_offset: u32, s_size: u32) {
-        let t_offset = t_offset as usize;
-        let s_size = s_size as usize;
+    fn copy_exact(target: &mut [u8], source: &[u8], target_offset: u32, source_size: u32) {
+        let target_offset = target_offset as usize;
+        let source_size = source_size as usize;
 
         // Check if the offset is within the target slice
-        if t_offset >= target.len() {
-            // Nothing to copy, offset is beyond target length
+        if target_offset >= target.len() {
+            eprintln!("ERROR: Specified target offset is bigger than target len");
             return;
         }
 
         // Calculate the actual number of bytes we can copy
-        let available_target_space = target.len() - t_offset;
+        let available_target_space = target.len() - target_offset;
         let available_source_bytes = source.len();
-        let bytes_to_copy = s_size
+        let bytes_to_copy = source_size
             .min(available_target_space)
             .min(available_source_bytes);
 
         // Perform the copy
-        target[t_offset..t_offset + bytes_to_copy].copy_from_slice(&source[..bytes_to_copy]);
+        target[target_offset..target_offset + bytes_to_copy]
+            .copy_from_slice(&source[..bytes_to_copy]);
     }
 
     pub extern "C" fn store_in_selfbalance_ptr(&mut self, balance: &mut U256) {
@@ -844,6 +864,7 @@ pub mod symbols {
     pub const GET_BLOCK_HASH: &str = "evm_mlir__get_block_hash";
     pub const GET_CODE_HASH: &str = "evm_mlir__get_code_hash";
     pub const CALL: &str = "evm_mlir__call";
+    pub const GET_RETURN_DATA_SIZE: &str = "evm_mlir__get_return_data_size";
 }
 
 /// Registers all the syscalls as symbols in the execution engine
@@ -1027,6 +1048,11 @@ pub fn register_syscalls(engine: &ExecutionEngine) {
         engine.register_symbol(
             symbols::GET_CODE_HASH,
             SyscallContext::get_code_hash as *const fn(*mut c_void, *mut U256) as *mut (),
+        );
+
+        engine.register_symbol(
+            symbols::GET_RETURN_DATA_SIZE,
+            SyscallContext::get_return_data_size as *const fn(*mut c_void) as *mut (),
         );
     };
 }
@@ -1410,6 +1436,15 @@ pub(crate) mod mlir {
             context,
             StringAttribute::new(context, symbols::GET_CODE_HASH),
             TypeAttribute::new(FunctionType::new(context, &[ptr_type, ptr_type], &[]).into()),
+            Region::new(),
+            attributes,
+            location,
+        ));
+
+        module.body().append_operation(func::func(
+            context,
+            StringAttribute::new(context, symbols::GET_RETURN_DATA_SIZE),
+            TypeAttribute::new(FunctionType::new(context, &[ptr_type], &[uint64]).into()),
             Region::new(),
             attributes,
             location,
@@ -2080,5 +2115,25 @@ pub(crate) mod mlir {
             &[],
             location,
         ));
+    }
+
+    pub(crate) fn get_return_data_size<'c>(
+        mlir_ctx: &'c MeliorContext,
+        syscall_ctx: Value<'c, 'c>,
+        block: &'c Block,
+        location: Location<'c>,
+    ) -> Result<Value<'c, 'c>, CodegenError> {
+        let uint64 = IntegerType::new(mlir_ctx, 64).into();
+        let result = block
+            .append_operation(func::call(
+                mlir_ctx,
+                FlatSymbolRefAttribute::new(mlir_ctx, symbols::GET_RETURN_DATA_SIZE),
+                &[syscall_ctx],
+                &[uint64],
+                location,
+            ))
+            .result(0)?;
+
+        Ok(result.into())
     }
 }
