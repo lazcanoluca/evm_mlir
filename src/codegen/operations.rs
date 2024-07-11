@@ -116,7 +116,8 @@ pub fn generate_code_for_op<'c>(
         Operation::Invalid => codegen_invalid(op_ctx, region),
         Operation::BlockHash => codegen_blockhash(op_ctx, region),
         Operation::ExtcodeHash => codegen_extcodehash(op_ctx, region),
-        Operation::Create => codegen_create(op_ctx, region),
+        Operation::Create => codegen_create(op_ctx, region, false),
+        Operation::Create2 => codegen_create(op_ctx, region, true),
     }
 }
 
@@ -5183,6 +5184,7 @@ fn codegen_returndatacopy<'c, 'r>(
 fn codegen_create<'c, 'r>(
     op_ctx: &mut OperationCtx<'c>,
     region: &'r Region<'c>,
+    is_create2: bool,
 ) -> Result<(BlockRef<'c, 'r>, BlockRef<'c, 'r>), CodegenError> {
     let start_block = region.append_block(Block::new(&[]));
     let context = &op_ctx.mlir_context;
@@ -5193,7 +5195,8 @@ fn codegen_create<'c, 'r>(
     let uint256 = IntegerType::new(context, 256);
     let ptr_type = pointer(context, 0);
 
-    let flag = check_stack_has_at_least(context, &start_block, 3)?;
+    let stack_size = if is_create2 { 4 } else { 3 };
+    let flag = check_stack_has_at_least(context, &start_block, stack_size)?;
     let ok_block = region.append_block(Block::new(&[]));
 
     start_block.append_operation(cf::cond_br(
@@ -5284,14 +5287,28 @@ fn codegen_create<'c, 'r>(
         LoadStoreOptions::default().align(IntegerAttribute::new(uint64.into(), 1).into()),
     ));
 
-    let result = op_ctx.create_syscall(
-        &create_block,
-        size_as_u32,
-        offset_as_u32,
-        value_ptr,
-        gas_ptr,
-        location,
-    )?;
+    let result = if is_create2 {
+        let salt = stack_pop(context, &create_block)?;
+        let salt_ptr = allocate_and_store_value(op_ctx, &create_block, salt, location)?;
+        op_ctx.create2_syscall(
+            &create_block,
+            size_as_u32,
+            offset_as_u32,
+            value_ptr,
+            gas_ptr,
+            salt_ptr,
+            location,
+        )?
+    } else {
+        op_ctx.create_syscall(
+            &create_block,
+            size_as_u32,
+            offset_as_u32,
+            value_ptr,
+            gas_ptr,
+            location,
+        )?
+    };
 
     // Check if the return code is error
     let zero_constant_value = create_block

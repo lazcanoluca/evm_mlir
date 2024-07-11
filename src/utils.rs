@@ -18,13 +18,12 @@ use sha3::{Digest, Keccak256};
 
 use crate::{
     codegen::context::OperationCtx,
-    constants::gas_cost,
     constants::{
-        CALLDATA_PTR_GLOBAL, CALLDATA_SIZE_GLOBAL, GAS_COUNTER_GLOBAL, MAX_STACK_SIZE,
+        gas_cost, CALLDATA_PTR_GLOBAL, CALLDATA_SIZE_GLOBAL, GAS_COUNTER_GLOBAL, MAX_STACK_SIZE,
         MEMORY_PTR_GLOBAL, MEMORY_SIZE_GLOBAL, STACK_BASEPTR_GLOBAL, STACK_PTR_GLOBAL,
     },
     errors::CodegenError,
-    primitives::{Address, H160},
+    primitives::{Address, H160, U256},
     syscall::ExitStatusCode,
 };
 
@@ -1674,7 +1673,7 @@ pub fn encode_rlp_u64(number: u64) -> Bytes {
     buf.into()
 }
 
-pub fn compute_contract_dest_address(address: H160, nonce: u64) -> Address {
+pub fn compute_contract_address(address: H160, nonce: u64) -> Address {
     // Compute the destination address as keccak256(rlp([sender_address,sender_nonce]))[12:]
     // TODO: replace manual encoding once rlp is added
     let encoded_nonce = encode_rlp_u64(nonce);
@@ -1686,5 +1685,21 @@ pub fn compute_contract_dest_address(address: H160, nonce: u64) -> Address {
     buf.extend_from_slice(&encoded_nonce);
     let mut hasher = Keccak256::new();
     hasher.update(&buf);
+    Address::from_slice(&hasher.finalize()[12..])
+}
+
+pub fn compute_contract_address2(address: H160, salt: U256, initialization_code: &[u8]) -> Address {
+    // Compute the destination address as keccak256(0xff + sender_address + salt + keccak256(initialisation_code))[12:]
+    let mut hasher = Keccak256::new();
+    hasher.update(initialization_code);
+    let initialization_code_hash = hasher.finalize();
+
+    let mut hasher = Keccak256::new();
+    let mut salt_bytes = [0; 32];
+    salt.to_big_endian(&mut salt_bytes);
+    hasher.update([0xff]);
+    hasher.update(address.as_bytes());
+    hasher.update(salt_bytes);
+    hasher.update(initialization_code_hash);
     Address::from_slice(&hasher.finalize()[12..])
 }
