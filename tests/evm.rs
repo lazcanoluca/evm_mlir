@@ -3,7 +3,7 @@ use sha3::{Digest, Keccak256};
 use std::{collections::HashMap, str::FromStr};
 
 use evm_mlir::{
-    constants::{call_opcode, gas_cost},
+    constants::{call_opcode, gas_cost, EMPTY_CODE_HASH_STR},
     db::{Bytecode, Database, Db},
     env::TransactTo,
     primitives::{Address, Bytes, B256, U256 as EU256},
@@ -2791,9 +2791,9 @@ fn create_happy_path() {
         Operation::Push((1, BigUint::ZERO)),
         Operation::Mstore,
         // Create
-        Operation::Push((1, BigUint::from(value))),
-        Operation::Push((1, BigUint::from(offset))),
         Operation::Push((1, BigUint::from(size))),
+        Operation::Push((1, BigUint::from(offset))),
+        Operation::Push((1, BigUint::from(value))),
         Operation::Create,
     ];
     append_return_result_operations(&mut operations);
@@ -2848,9 +2848,9 @@ fn create_with_balance_underflow() {
         Operation::Push((1, BigUint::ZERO)),
         Operation::Mstore,
         // Create
-        Operation::Push((1, BigUint::from(value))),
-        Operation::Push((1, BigUint::from(offset))),
         Operation::Push((1, BigUint::from(size))),
+        Operation::Push((1, BigUint::from(offset))),
+        Operation::Push((1, BigUint::from(value))),
         Operation::Create,
     ];
     append_return_result_operations(&mut operations);
@@ -2877,15 +2877,13 @@ fn create_with_balance_underflow() {
 
 #[test]
 fn create_with_invalid_initialization_code() {
-    let value: u8 = 10;
+    let value: u8 = 0;
     let offset: u8 = 19;
     let size: u8 = 13;
-    let sender_nonce = 1;
-    let sender_balance = EU256::zero();
-    let sender_addr = Address::from_low_u64_be(40);
 
     // Code that halts
     let initialization_code = hex::decode("63ffffffff526004601cf3").unwrap();
+    let initialization_code_hash = B256::from_str(EMPTY_CODE_HASH_STR).unwrap();
 
     let mut operations = vec![
         // Store initialization code in memory
@@ -2893,29 +2891,59 @@ fn create_with_invalid_initialization_code() {
         Operation::Push((1, BigUint::ZERO)),
         Operation::Mstore,
         // Create
-        Operation::Push((1, BigUint::from(value))),
-        Operation::Push((1, BigUint::from(offset))),
         Operation::Push((1, BigUint::from(size))),
+        Operation::Push((1, BigUint::from(offset))),
+        Operation::Push((1, BigUint::from(value))),
         Operation::Create,
     ];
     append_return_result_operations(&mut operations);
-    let (mut env, mut db) = default_env_and_db_setup(operations);
-    db.set_account(
-        sender_addr,
-        sender_nonce,
-        sender_balance,
-        Default::default(),
-    );
+    let (mut env, db) = default_env_and_db_setup(operations);
     env.tx.value = EU256::from(value);
     let mut evm = Evm::new(env, db);
     let result = evm.transact().unwrap().result;
 
-    // Check that the result is zero
-    assert!(result.is_success());
-    assert_eq!(result.output().unwrap().to_vec(), [0_u8; 32].to_vec());
+    // Check that contract is created in the returned address with empty bytecode
+    let returned_addr = Address::from_slice(&result.output().unwrap()[12..]);
+    let new_account = evm.db.basic(returned_addr).unwrap().unwrap();
+    assert_eq!(new_account.balance, EU256::from(value));
+    assert_eq!(new_account.nonce, 1);
+    assert_eq!(new_account.code_hash, initialization_code_hash);
+}
 
-    // Check that the sender account is not updated
-    let sender_account = evm.db.basic(sender_addr).unwrap().unwrap();
-    assert_eq!(sender_account.nonce, sender_nonce);
-    assert_eq!(sender_account.balance, sender_balance);
+#[test]
+fn create_gas_cost() {
+    let value: u8 = 0;
+    let offset: u8 = 19;
+    let size: u8 = 13;
+
+    // Code that returns the value 0xffffffff
+    let initialization_code = hex::decode("63FFFFFFFF6000526004601CF3").unwrap();
+    let initialization_gas_cost: i64 = 18;
+    let minimum_word_size: i64 = 1;
+    let deployed_code_size: i64 = 4;
+
+    let needed_gas = gas_cost::PUSHN * 4
+        + gas_cost::PUSH0
+        + gas_cost::MSTORE
+        + gas_cost::memory_expansion_cost(0, (size + offset).into())
+        + gas_cost::CREATE
+        + initialization_gas_cost
+        + gas_cost::INIT_WORD_COST * minimum_word_size
+        + gas_cost::BYTE_DEPOSIT_COST * deployed_code_size;
+
+    let operations = vec![
+        // Store initialization code in memory
+        Operation::Push((13, BigUint::from_bytes_be(&initialization_code))),
+        Operation::Push0,
+        Operation::Mstore,
+        // Create
+        Operation::Push((1, BigUint::from(size))),
+        Operation::Push((1, BigUint::from(offset))),
+        Operation::Push((1, BigUint::from(value))),
+        Operation::Create,
+    ];
+    let (mut env, db) = default_env_and_db_setup(operations);
+    env.tx.value = EU256::from(value);
+
+    run_program_assert_gas_exact_with_db(env, db, needed_gas as _);
 }
