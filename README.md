@@ -155,7 +155,9 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 1. (0xA4) LOG4
 1. (0xF0) CREATE
 1. (0xF1) CALL
+1. (0xF2) CALLCODE
 1. (0xF3) RETURN
+1. (0xF4) DELEGATECALL
 1. (0xF5) CREATE2
 1. (0xFA) STATICCALL
 1. (0xFD) REVERT
@@ -166,9 +168,6 @@ An EVM-bytecode to machine-bytecode compiler using MLIR and LLVM.
 
 <details>
 <summary>Not yet implemented opcodes (click to open)</summary>
-
-1. (0xF2) CALLCODE
-1. (0xF4) DELEGATECALL
 
 </details>
 

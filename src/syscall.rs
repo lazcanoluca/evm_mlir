@@ -18,7 +18,7 @@
 use std::ffi::c_void;
 
 use crate::{
-    constants::{call_opcode, gas_cost},
+    constants::{call_opcode, gas_cost, CallType},
     context::Context,
     db::{AccountInfo, Database, Db},
     env::{Env, TransactTo},
@@ -280,12 +280,14 @@ impl<'c> SyscallContext<'c> {
         ret_size: u32,
         available_gas: u64,
         consumed_gas: &mut u64,
-        is_static: bool,
+        call_type: u8,
     ) -> u8 {
         //TODO: Add call depth check
         //TODO: Check that the args offsets and sizes are correct -> This from the MLIR side
         let callee_address = Address::from(call_to_address);
         let value = value_to_transfer.to_primitive_u256();
+        let call_type =
+            CallType::try_from(call_type).expect("Error while parsing CallType on call syscall");
 
         //TODO: This should instead add the account fetch (warm or cold) cost
         //For the moment we consider warm access
@@ -351,14 +353,17 @@ impl<'c> SyscallContext<'c> {
         gas_to_send += stipend;
 
         let mut env = self.env.clone();
-        env.tx.transact_to = TransactTo::Call(callee_address);
 
-        //TODO: Check if this is ok
-        let new_frame_caller = match self.env.tx.transact_to {
-            TransactTo::Call(a) => a,
-            TransactTo::Create => Address::zero(),
+        //TODO: Check if calling `get_address()` here is ok
+        let this_address = self.env.tx.get_address();
+        let (new_frame_caller, new_value, transact_to) = match call_type {
+            CallType::Call | CallType::StaticCall => (this_address, value, callee_address),
+            CallType::CallCode => (this_address, value, this_address),
+            CallType::DelegateCall => (self.call_frame.caller, self.env.tx.value, this_address),
         };
-        env.tx.value = value;
+
+        env.tx.value = new_value;
+        env.tx.transact_to = TransactTo::Call(transact_to);
         env.tx.gas_limit = gas_to_send;
 
         //Copy the calldata from memory
@@ -380,6 +385,8 @@ impl<'c> SyscallContext<'c> {
         let module = context
             .compile(&program, Default::default())
             .expect("failed to compile program");
+
+        let is_static = self.call_frame.ctx_is_static || call_type == CallType::StaticCall;
 
         let call_frame = CallFrame {
             caller: new_frame_caller,
@@ -1156,7 +1163,7 @@ impl<'c> SyscallContext<'c> {
                         u32,
                         u64,
                         *mut u64,
-                        bool,
+                        u8,
                     ) as *mut (),
             );
             engine.register_symbol(
@@ -1339,7 +1346,6 @@ pub(crate) mod mlir {
 
         // Type declarations
         let ptr_type = pointer(context, 0);
-        let uint1 = IntegerType::new(context, 1).into();
         let uint8 = IntegerType::new(context, 8).into();
         let uint32 = IntegerType::new(context, 32).into();
         let uint64 = IntegerType::new(context, 64).into();
@@ -1648,7 +1654,7 @@ pub(crate) mod mlir {
                     context,
                     &[
                         ptr_type, uint64, ptr_type, ptr_type, uint32, uint32, uint32, uint32,
-                        uint64, ptr_type, uint1,
+                        uint64, ptr_type, uint8,
                     ],
                     &[uint8],
                 )
@@ -2343,7 +2349,7 @@ pub(crate) mod mlir {
         ret_size: Value<'c, 'c>,
         available_gas: Value<'c, 'c>,
         remaining_gas_ptr: Value<'c, 'c>,
-        is_static: Value<'c, 'c>,
+        call_type: Value<'c, 'c>,
     ) -> Result<Value<'c, 'c>, CodegenError> {
         let uint8 = IntegerType::new(mlir_ctx, 8).into();
         let result = block
@@ -2361,7 +2367,7 @@ pub(crate) mod mlir {
                     ret_size,
                     available_gas,
                     remaining_gas_ptr,
-                    is_static,
+                    call_type,
                 ],
                 &[uint8],
                 location,
