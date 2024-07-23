@@ -24,7 +24,7 @@ use crate::{
     env::{Env, TransactTo},
     executor::{Executor, OptLevel},
     journal::Journal,
-    precompiles::{blake2f, ecrecover, identity},
+    precompiles::{blake2f, ecrecover, identity, modexp, ripemd_160, sha2_256},
     primitives::{Address, Bytes, B256, U256 as EU256},
     program::Program,
     result::{EVMError, ExecutionResult, HaltReason, Output, ResultAndState, SuccessReason},
@@ -292,13 +292,25 @@ impl<'c> SyscallContext<'c> {
                 call_opcode::SUCCESS_RETURN_CODE,
                 ecrecover(&calldata, gas_to_send, consumed_gas).unwrap_or_default(),
             ),
-            x if x == Address::from_low_u64_be(precompiles::BLAKE2F_ADDRESS) => (
-                call_opcode::SUCCESS_RETURN_CODE,
-                blake2f(&calldata, gas_to_send, consumed_gas).unwrap_or_default(),
-            ),
             x if x == Address::from_low_u64_be(precompiles::IDENTITY_ADDRESS) => (
                 call_opcode::SUCCESS_RETURN_CODE,
                 identity(&calldata, gas_to_send, consumed_gas),
+            ),
+            x if x == Address::from_low_u64_be(precompiles::SHA2_256_ADDRESS) => (
+                call_opcode::SUCCESS_RETURN_CODE,
+                sha2_256(&calldata, gas_to_send, consumed_gas),
+            ),
+            x if x == Address::from_low_u64_be(precompiles::RIPEMD_160_ADDRESS) => (
+                call_opcode::SUCCESS_RETURN_CODE,
+                ripemd_160(&calldata, gas_to_send, consumed_gas),
+            ),
+            x if x == Address::from_low_u64_be(precompiles::MODEXP_ADDRESS) => (
+                call_opcode::SUCCESS_RETURN_CODE,
+                modexp(&calldata, gas_to_send, consumed_gas),
+            ),
+            x if x == Address::from_low_u64_be(precompiles::BLAKE2F_ADDRESS) => (
+                call_opcode::SUCCESS_RETURN_CODE,
+                blake2f(&calldata, gas_to_send, consumed_gas).unwrap_or_default(),
             ),
             _ => {
                 // Execute subcontext

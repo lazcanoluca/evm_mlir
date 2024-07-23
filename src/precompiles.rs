@@ -1,19 +1,20 @@
-use std::array::TryFromSliceError;
-
+use crate::constants::precompiles::{
+    blake2_gas_cost, identity_dynamic_cost, ripemd_160_dynamic_cost, sha2_256_dynamic_cost,
+    ECRECOVER_COST, IDENTITY_COST, RIPEMD_160_COST, SHA2_256_COST,
+};
+use crate::primitives::U256;
 use bytes::Bytes;
+use num_bigint::BigUint;
 use secp256k1::{ecdsa, Message, Secp256k1};
 use sha3::{Digest, Keccak256};
-
-use crate::constants::precompiles::{
-    blake2_gas_cost, identity_dynamic_cost, ECRECOVER_COST, IDENTITY_COST,
-};
+use std::array::TryFromSliceError;
 
 pub fn ecrecover(
     calldata: &Bytes,
     gas_limit: u64,
     consumed_gas: &mut u64,
 ) -> Result<Bytes, secp256k1::Error> {
-    if gas_limit < ECRECOVER_COST {
+    if gas_limit < ECRECOVER_COST || calldata.len() < 128 {
         return Ok(Bytes::new());
     }
     *consumed_gas += ECRECOVER_COST;
@@ -42,6 +43,85 @@ pub fn identity(calldata: &Bytes, gas_limit: u64, consumed_gas: &mut u64) -> Byt
     }
     *consumed_gas += gas_cost;
     calldata.clone()
+}
+
+pub fn sha2_256(calldata: &Bytes, gas_limit: u64, consumed_gas: &mut u64) -> Bytes {
+    let gas_cost = SHA2_256_COST + sha2_256_dynamic_cost(calldata.len() as u64);
+    if gas_limit < gas_cost {
+        return Bytes::new();
+    }
+    *consumed_gas += gas_cost;
+    let hash = sha2::Sha256::digest(calldata);
+    Bytes::copy_from_slice(&hash)
+}
+
+pub fn ripemd_160(calldata: &Bytes, gas_limit: u64, consumed_gas: &mut u64) -> Bytes {
+    let gas_cost = RIPEMD_160_COST + ripemd_160_dynamic_cost(calldata.len() as u64);
+    if gas_limit < gas_cost {
+        return Bytes::new();
+    }
+    *consumed_gas += gas_cost;
+    let mut hasher = ripemd::Ripemd160::new();
+    hasher.update(calldata);
+    let mut output = [0u8; 32];
+    hasher.finalize_into((&mut output[12..]).into());
+    Bytes::copy_from_slice(&output)
+}
+
+pub fn modexp(calldata: &Bytes, gas_limit: u64, consumed_gas: &mut u64) -> Bytes {
+    if calldata.len() < 96 {
+        return Bytes::new();
+    }
+
+    // Cast sizes as usize and check for overflow.
+    // Bigger sizes are not accepted, as memory can't index bigger values.
+    let Ok(b_size) = usize::try_from(U256::from_big_endian(&calldata[0..32])) else {
+        return Bytes::new();
+    };
+    let Ok(e_size) = usize::try_from(U256::from_big_endian(&calldata[32..64])) else {
+        return Bytes::new();
+    };
+    let Ok(m_size) = usize::try_from(U256::from_big_endian(&calldata[64..96])) else {
+        return Bytes::new();
+    };
+
+    // Check if calldata contains all values
+    let params_len = 96 + b_size + e_size + m_size;
+    if calldata.len() < params_len {
+        return Bytes::new();
+    }
+    let b = BigUint::from_bytes_be(&calldata[96..96 + b_size]);
+    let e = BigUint::from_bytes_be(&calldata[96 + b_size..96 + b_size + e_size]);
+    let m = BigUint::from_bytes_be(&calldata[96 + b_size + e_size..params_len]);
+
+    // Compute gas cost
+    let max_length = b_size.max(m_size);
+    let words = (max_length + 7) / 8;
+    let multiplication_complexity = (words * words) as u64;
+    let iteration_count = if e_size <= 32 && e != BigUint::ZERO {
+        e.bits() - 1
+    } else if e_size > 32 {
+        8 * (e_size as u64 - 32) + e.bits().max(1) - 1
+    } else {
+        0
+    };
+    let calculate_iteration_count = iteration_count.max(1);
+    let gas_cost = (multiplication_complexity * calculate_iteration_count / 3).max(200);
+    if gas_limit < gas_cost {
+        return Bytes::new();
+    }
+    *consumed_gas += gas_cost;
+
+    let result = if m == BigUint::ZERO {
+        BigUint::ZERO
+    } else if e == BigUint::ZERO {
+        BigUint::from(1_u8) % m
+    } else {
+        b.modpow(&e, &m)
+    };
+
+    let output = &result.to_bytes_be()[..m_size];
+    Bytes::copy_from_slice(output)
 }
 
 // Extracted from https://datatracker.ietf.org/doc/html/rfc7693#section-2.7
@@ -196,7 +276,63 @@ pub fn blake2f(
 
 #[cfg(test)]
 mod tests {
+    use crate::primitives::U256;
+
     use super::*;
+
+    #[test]
+    fn modexp_gas_cost() {
+        let b_size = U256::from(1_u8);
+        let e_size = U256::from(1_u8);
+        let m_size = U256::from(1_u8);
+        let b = 8_u8;
+        let e = 9_u8;
+        let m = 10_u8;
+        let mut calldata = [0_u8; 99];
+        b_size.to_big_endian(&mut calldata[..32]);
+        e_size.to_big_endian(&mut calldata[32..64]);
+        m_size.to_big_endian(&mut calldata[64..96]);
+        calldata[96] = b;
+        calldata[97] = e;
+        calldata[98] = m;
+
+        let expected_gas = 200;
+        let mut consumed_gas = 0;
+        modexp(
+            &Bytes::copy_from_slice(&calldata),
+            expected_gas,
+            &mut consumed_gas,
+        );
+
+        assert_eq!(consumed_gas, expected_gas);
+    }
+
+    #[test]
+    fn modexp_gas_cost2() {
+        let b_size = U256::from(256_u16);
+        let e_size = U256::from(1_u8);
+        let m_size = U256::from(1_u8);
+        let b = 8_u8;
+        let e = 6_u8;
+        let m = 10_u8;
+        let mut calldata = [0_u8; 354];
+        b_size.to_big_endian(&mut calldata[..32]);
+        e_size.to_big_endian(&mut calldata[32..64]);
+        m_size.to_big_endian(&mut calldata[64..96]);
+        calldata[351] = b;
+        calldata[352] = e;
+        calldata[353] = m;
+
+        let expected_gas = 682;
+        let mut consumed_gas = 0;
+        modexp(
+            &Bytes::copy_from_slice(&calldata),
+            expected_gas,
+            &mut consumed_gas,
+        );
+
+        assert_eq!(consumed_gas, expected_gas);
+    }
 
     #[test]
     fn test_blake2_evm_codes_happy_path() {
